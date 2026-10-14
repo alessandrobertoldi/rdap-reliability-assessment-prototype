@@ -1,0 +1,39 @@
+# Production-like deployment: the RDAP server behind Caddy, which obtains
+# and renews the TLS certificate from Let's Encrypt on its own.
+#
+#   RDAP_HOST=rdap-test.bcsec.io docker compose up -d
+#
+# The RDAP server is not exposed directly: only Caddy listens on 80/443.
+# To enable the -04 "referring to a service" arrangement set RDAP_REFERRAL=1.
+
+services:
+  rdap:
+    build: ..
+    image: rdap-ra-proto:latest
+    restart: unless-stopped
+    read_only: true
+    environment:
+      RDAP_BASE_URL: "https://${RDAP_HOST:-localhost}"
+      RDAP_REFERRAL: "${RDAP_REFERRAL:-0}"
+    command: ["--port", "8080", "--base-url", "https://${RDAP_HOST:-localhost}"]
+    expose:
+      - "8080"
+
+  caddy:
+    image: caddy:2
+    restart: unless-stopped
+    ports:
+      - "80:80"
+      - "443:443"
+    environment:
+      RDAP_HOST: "${RDAP_HOST:-localhost}"
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy_data:/data
+      - caddy_config:/config
+    depends_on:
+      - rdap
+
+volumes:
+  caddy_data:
+  caddy_config:

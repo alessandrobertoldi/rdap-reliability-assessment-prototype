@@ -1,0 +1,38 @@
+{
+  "rdapConformance": ["rdap_level_0", "reliabilityAssessment"],
+  "objectClassName": "domain",
+  "handle": "D-ASSESSED-1",
+  "ldhName": "assessed.example",
+  "status": ["active"],
+  "events": [
+    {"eventAction": "registration", "eventDate": "2024-01-01T00:00:00Z"},
+    {"eventAction": "expiration", "eventDate": "2027-01-01T00:00:00Z"}
+  ],
+  "entities": [
+    {
+      "objectClassName": "entity",
+      "handle": "RAR1001",
+      "roles": ["registrar"],
+      "publicIds": [{"type": "IANA Registrar ID", "identifier": "1001"}],
+      "links": [
+        {"value": "{BASE}/domain/assessed.example",
+         "rel": "related",
+         "href": "{BASE}/entity/RAR1001",
+         "type": "application/rdap+json"}
+      ]
+    }
+  ],
+  "reliabilityAssessment_results": [
+    {
+      "scoreScheme": "https://assessor.example/schemes/domain/v2",
+      "scoreIssuer": "https://assessor.example",
+      "scoreValue": 9,
+      "scoreMaxValue": 10,
+      "scoreDate": "2026-10-01T00:00:00Z",
+      "validUntil": "2027-01-01T00:00:00Z",
+      "assessmentId": "d-2026-10-01-7781",
+      "status": "active",
+      "evidenceUri": "https://assessor.example/rep/d-2026-10-01-7781"
+    }
+  ]
+}

@@ -1,0 +1,10 @@
+__pycache__/
+*.pyc
+*.log
+.venv/
+.env
+deploy/.env
+caddy_data/
+caddy_config/
+.DS_Store
+Thumbs.db

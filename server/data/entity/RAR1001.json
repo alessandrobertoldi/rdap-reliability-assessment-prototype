@@ -1,0 +1,33 @@
+{
+  "rdapConformance": ["rdap_level_0", "reliabilityAssessment"],
+  "objectClassName": "entity",
+  "handle": "RAR1001",
+  "roles": ["registrar"],
+  "publicIds": [{"type": "IANA Registrar ID", "identifier": "1001"}],
+  "vcardArray": ["vcard", [
+    ["version", {}, "text", "4.0"],
+    ["fn", {}, "text", "Example Registrar One (fictional)"],
+    ["kind", {}, "text", "org"]
+  ]],
+  "reliabilityAssessment_results": [
+    {
+      "scoreScheme": "https://assessor.example/schemes/registrar/v1",
+      "scoreIssuer": "https://assessor.example",
+      "scoreValue": 10,
+      "scoreMaxValue": 10,
+      "scoreDate": "2026-09-15T00:00:00Z",
+      "validUntil": "2027-03-15T00:00:00Z",
+      "assessmentId": "r-2026-09-15-0003",
+      "status": "active"
+    },
+    {
+      "scoreScheme": "https://observatory.example/scheme/2026",
+      "scoreIssuer": "https://observatory.example",
+      "scoreValue": 62,
+      "scoreMaxValue": 100,
+      "scoreDate": "2026-10-02T00:00:00Z",
+      "assessmentId": "2026-10-02-REG-1001",
+      "status": "under review"
+    }
+  ]
+}

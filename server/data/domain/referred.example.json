@@ -1,0 +1,11 @@
+{
+  "rdapConformance": ["rdap_level_0"],
+  "objectClassName": "domain",
+  "handle": "D-REFERRED-1",
+  "ldhName": "referred.example",
+  "status": ["active"],
+  "events": [
+    {"eventAction": "registration", "eventDate": "2025-02-14T00:00:00Z"}
+  ],
+  "x_referral": true
+}

@@ -1,0 +1,17 @@
+{
+  "rdapConformance": ["rdap_level_0", "reliabilityAssessment"],
+  "objectClassName": "domain",
+  "ldhName": "referred.example",
+  "reliabilityAssessment_results": [
+    {
+      "scoreScheme": "https://assessor.example/schemes/domain/v2",
+      "scoreIssuer": "https://assessor.example",
+      "scoreValue": 7,
+      "scoreMaxValue": 10,
+      "scoreDate": "2026-10-05T08:00:00Z",
+      "validUntil": "2027-01-05T00:00:00Z",
+      "assessmentId": "d-2026-10-05-0112",
+      "status": "active"
+    }
+  ]
+}

@@ -1,0 +1,19 @@
+{$RDAP_HOST} {
+	encode gzip
+	header {
+		Strict-Transport-Security "max-age=31536000"
+		X-Content-Type-Options "nosniff"
+		-Server
+	}
+	# Only the RDAP paths reach the application. Everything else is refused
+	# here, before it reaches Python.
+	@rdap path /help /domain/* /entity/* /assessor/*
+	handle @rdap {
+		reverse_proxy rdap:8080
+	}
+	handle {
+		respond `{"rdapConformance":["rdap_level_0"],"errorCode":404,"title":"Not Found","description":["Unknown path."]}` 404 {
+			close
+		}
+	}
+}

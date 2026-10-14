@@ -1,0 +1,24 @@
+{
+  "rdapConformance": ["rdap_level_0"],
+  "objectClassName": "domain",
+  "handle": "D-PLAIN-1",
+  "ldhName": "plain.example",
+  "status": ["active"],
+  "events": [
+    {"eventAction": "registration", "eventDate": "2025-06-01T00:00:00Z"}
+  ],
+  "entities": [
+    {
+      "objectClassName": "entity",
+      "handle": "RAR1002",
+      "roles": ["registrar"],
+      "publicIds": [{"type": "IANA Registrar ID", "identifier": "1002"}],
+      "links": [
+        {"value": "{BASE}/domain/plain.example",
+         "rel": "related",
+         "href": "{BASE}/entity/RAR1002",
+         "type": "application/rdap+json"}
+      ]
+    }
+  ]
+}
