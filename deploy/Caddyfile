@@ -23,6 +23,8 @@
 	request_body {
 		max_size 4KB
 	}
+	# The bare host is not an RDAP query: send a human to the help response.
+	redir / /help 302
 	# Only the RDAP paths reach the application. Everything else is refused
 	# here, before it reaches Python.
 	@rdap path /help /domain/* /entity/* /assessor/* /domains /domains/* /entities /entities/* /nameserver/* /nameservers /nameservers/* /ip/* /autnum/*
