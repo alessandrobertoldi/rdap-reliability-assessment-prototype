@@ -1,4 +1,4 @@
-# rdap-ra-proto
+# rdap-reliability-assessment-prototype
 
 Prototype server and client for the RDAP extension **`reliabilityAssessment`**,
 registered in the IANA RDAP Extensions Registry on 6 October 2026 against the
