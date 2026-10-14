@@ -295,9 +295,12 @@ def help_object():
 
 
 class Handler(BaseHTTPRequestHandler):
-    server_version = "rdap-ra-proto/0.1.2"
+    server_version = "rdap-ra-proto/0.1.3"
     sys_version = ""
     protocol_version = "HTTP/1.1"
+    # Idle socket timeout: a client that opens a connection and sends nothing
+    # (or dribbles bytes) is dropped after this many seconds.
+    timeout = 15
 
     def log_message(self, fmt, *args):
         sys.stderr.write("%s - %s\n" % (self.address_string(), fmt % args))
@@ -426,6 +429,7 @@ def main():
           f"referral {'ON' if args.referral else 'OFF'}", file=sys.stderr)
     if args.check:
         return
+    ThreadingHTTPServer.daemon_threads = True
     httpd = ThreadingHTTPServer((args.bind, args.port), Handler)
     print(f"listening on {args.bind}:{args.port}, base URL {args.base_url}", file=sys.stderr)
     try:

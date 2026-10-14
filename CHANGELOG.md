@@ -1,5 +1,22 @@
 # Changelog
 
+## 0.1.3 (2026-10-14)
+
+Deployment hardening after a security review of the public test instance.
+
+* Caddy: read/idle timeouts and a 16 KB header limit (slow or oversized
+  requests are refused early); request body limited to 4 KB;
+  `Referrer-Policy` and a restrictive `Content-Security-Policy`; HTTP/3 port
+  (443/udp) actually published, so the advertised `alt-svc` is consistent;
+  image pinned to the 2.11 line.
+* Compose: both containers drop all capabilities (Caddy keeps
+  `NET_BIND_SERVICE`), run with `no-new-privileges`, and have memory and PID
+  limits; log rotation for both.
+* Server: idle socket timeout of 15 s; handler threads are daemon threads.
+* Host (not in this repository): SSH key-only with root login disabled,
+  ufw allowing 22/80/443 only, fail2ban on SSH, full package upgrade.
+
+
 ## 0.1.2 (2026-10-14)
 
 Result of an adversarial conformance review against the v1, the -04,

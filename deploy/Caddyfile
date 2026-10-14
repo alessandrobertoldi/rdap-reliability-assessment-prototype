@@ -1,9 +1,27 @@
+# Global limits: the prototype accepts tiny GET/HEAD requests only, so
+# anything slow or large is refused early (slowloris, oversized headers).
+{
+	servers {
+		timeouts {
+			read_header 10s
+			read_body 10s
+			idle 2m
+		}
+		max_header_size 16KB
+	}
+}
+
 {$RDAP_HOST} {
 	encode gzip
 	header {
 		Strict-Transport-Security "max-age=31536000"
 		X-Content-Type-Options "nosniff"
+		Referrer-Policy "no-referrer"
+		Content-Security-Policy "default-src 'none'; frame-ancestors 'none'"
 		-Server
+	}
+	request_body {
+		max_size 4KB
 	}
 	# Only the RDAP paths reach the application. Everything else is refused
 	# here, before it reaches Python.

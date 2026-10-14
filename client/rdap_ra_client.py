@@ -76,7 +76,7 @@ def parse_dt(value):
 def fetch(url, timeout=15):
     req = urllib.request.Request(url, headers={
         "Accept": MEDIA_TYPE + ", application/json;q=0.5",
-        "User-Agent": "rdap-ra-client/0.1.2 (prototype)",
+        "User-Agent": "rdap-ra-client/0.1.3 (prototype)",
     })
     try:
         with urllib.request.urlopen(req, timeout=timeout) as r:
