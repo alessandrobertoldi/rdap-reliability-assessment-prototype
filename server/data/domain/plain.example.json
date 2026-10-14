@@ -14,8 +14,8 @@
       "roles": ["registrar"],
       "publicIds": [{"type": "IANA Registrar ID", "identifier": "1002"}],
       "links": [
-        {"value": "{BASE}/domain/plain.example",
-         "rel": "related",
+        {"value": "{BASE}/entity/RAR1002",
+         "rel": "self",
          "href": "{BASE}/entity/RAR1002",
          "type": "application/rdap+json"}
       ]

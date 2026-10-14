@@ -28,10 +28,15 @@ alessandro@bertoldicybersecurity.com.
   own response. The second arrangement, **referring to a service** through a
   link, is implemented behind a switch that is **off by default**, because the
   -04 does not fix the link relation and the v1 (Section 5.4) explains why
-  reusing `related` is ambiguous.
+  reusing `related` is ambiguous. With the switch on, the assessment service
+  is *simulated* under `<base>/assessor/` on the same host (`--assessor-base-url`
+  moves it elsewhere): an assessment service is by definition a separate
+  service, and neither document defines a path segment for it, so this is a
+  convention of the prototype, labelled `[proto]` by the client.
 * **Consumer rules**, applied and printed by the client with their origin:
   `[v1]` stated in the registered specification, `[-04]` stated only in the
-  draft, `[core]` RFC 7480 / RFC 9083.
+  draft, `[core]` RFC 7480 / RFC 9083 / draft-ietf-regext-rdap-extensions,
+  `[proto]` a convention of this prototype that no document states.
 
 ## Objects served (all fictional, under the reserved `.example` TLD)
 
@@ -90,9 +95,13 @@ internal port. Set `RDAP_REFERRAL=1` to enable the referral arrangement.
 * Read-only: responses are static JSON files under `server/data/`. There is no
   interface to create or modify results (the extension defines none).
 * Every data file is validated at start-up against the rules of the v1 and of
-  the -04 (`--check` validates and exits). A file that breaks a rule stops the
-  server from starting.
-* `GET` and `HEAD` only; `application/rdap+json`; errors are RDAP error objects.
+  the -04 (`--check` validates and exits), plus two hygiene rules of the
+  prototype that the documents do not state (no unknown member in a result; a
+  lookup response does not advertise the extension without carrying the
+  member). A file that breaks a rule stops the server from starting.
+* `GET` and `HEAD` only (other methods get 405); `application/rdap+json`
+  everywhere; every error, including those raised by the HTTP layer or by the
+  reverse proxy, is an RDAP error object, never HTML.
 
 ## License
 

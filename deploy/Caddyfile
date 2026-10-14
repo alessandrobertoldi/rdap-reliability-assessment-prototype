@@ -7,14 +7,22 @@
 	}
 	# Only the RDAP paths reach the application. Everything else is refused
 	# here, before it reaches Python.
-	@rdap path /help /domain/* /entity/* /assessor/*
+	@rdap path /help /domain/* /entity/* /assessor/* /domains /domains/* /entities /entities/* /nameserver/* /nameservers /nameservers/* /ip/* /autnum/*
 	handle @rdap {
 		reverse_proxy rdap:8080
 	}
 	handle {
 		header Content-Type "application/rdap+json"
+		header Access-Control-Allow-Origin "*"
 		respond `{"rdapConformance":["rdap_level_0"],"errorCode":404,"title":"Not Found","description":["Unknown path."]}` 404 {
 			close
 		}
+	}
+	# Errors raised by Caddy itself (upstream down, request too large, ...)
+	# are RDAP error objects as well, never HTML.
+	handle_errors {
+		header Content-Type "application/rdap+json"
+		header Access-Control-Allow-Origin "*"
+		respond `{"rdapConformance":["rdap_level_0"],"errorCode":{err.status_code},"title":"{err.status_text}","description":["The request could not be served."]}` {err.status_code}
 	}
 }

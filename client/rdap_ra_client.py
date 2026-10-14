@@ -12,7 +12,9 @@ Usage:
 Each rule the client applies is printed with its origin:
   [v1]   stated in bcsec-RDAP-RA Version 1, the registered specification
   [-04]  stated only in draft-bertoldi-regext-rdap-reliability-scoring-04
-  [core] RFC 7480 / RFC 9083, not specific to the extension
+  [core] RFC 7480 / RFC 9083 / draft-ietf-regext-rdap-extensions, not
+         specific to the extension
+  [proto] a convention of this prototype that no document states
 The two documents define the same wire format; the -04 adds consumer rules
 the v1 does not have. A client written against the v1 alone applies only
 the [v1] lines.
@@ -22,6 +24,7 @@ Python standard library only.
 
 import argparse
 import json
+import re
 import sys
 import urllib.error
 import urllib.request
@@ -50,18 +53,30 @@ class Report:
         self.lines.append(f"  --  [{origin:>4}] {text}")
 
 
+RFC3339_RE = re.compile(
+    r"^(\d{4})-(\d{2})-(\d{2})[Tt ](\d{2}):(\d{2}):(\d{2})(\.\d+)?([Zz]|[+-]\d{2}:\d{2})$")
+
+
 def parse_dt(value):
-    v = value[:-1] + "+00:00" if value.endswith("Z") else value
-    dt = datetime.fromisoformat(v)
-    if dt.tzinfo is None:
-        raise ValueError("no time zone")
-    return dt
+    """RFC 3339 Section 5.6 date-time (seconds required, fraction optional,
+    'Z' or numeric offset; 't', 'z' and a space separator per the note in
+    that section). Leap second 60 is read as 59."""
+    if not isinstance(value, str):
+        raise ValueError("not a string")
+    m = RFC3339_RE.match(value)
+    if not m:
+        raise ValueError("not RFC 3339")
+    y, mo, d, h, mi, sec, frac, off = m.groups()
+    if sec == "60":
+        sec = "59"
+    return datetime.fromisoformat(f"{y}-{mo}-{d}T{h}:{mi}:{sec}" + (frac[:7] if frac else "") +
+                                  ("+00:00" if off in ("Z", "z") else off))
 
 
 def fetch(url, timeout=15):
     req = urllib.request.Request(url, headers={
         "Accept": MEDIA_TYPE + ", application/json;q=0.5",
-        "User-Agent": "rdap-ra-client/0.1 (prototype)",
+        "User-Agent": "rdap-ra-client/0.1.2 (prototype)",
     })
     try:
         with urllib.request.urlopen(req, timeout=timeout) as r:
@@ -77,12 +92,20 @@ def check_result(res, idx, rep, now):
     where = f"result[{idx}]"
     # structure
     unknown = [k for k in res if k not in FIELDS]
-    rep.rule("v1", not unknown, f"{where}: no unknown members" +
-             (f" (found {unknown})" if unknown else ""))
+    if unknown:
+        rep.note("core", f"{where}: unknown members ignored, as a client MUST "
+                         f"(rdap-extensions, Section 2.4.1): {unknown}")
     rep.rule("v1", all(k in res for k in ("scoreScheme", "scoreIssuer")),
              f"{where}: scoreScheme and scoreIssuer present (REQUIRED)")
-    rep.rule("v1", all(v is not None for v in res.values()),
+    rep.rule("v1", all(res.get(k) is not None for k in FIELDS if k in res),
              f"{where}: no null members (a member without a value is omitted)")
+    bad_types = [k for k in FIELDS if k in res and res[k] is not None and not (
+        isinstance(res[k], (int, float)) and not isinstance(res[k], bool)
+        if k in ("scoreValue", "scoreMaxValue") else isinstance(res[k], str))]
+    rep.rule("v1", not bad_types, f"{where}: members have the JSON types of Section 7.5" +
+             (f" (wrong: {bad_types})" if bad_types else ""))
+    if bad_types:
+        res = {k: v for k, v in res.items() if k not in bad_types}
     # scheme / issuer
     issuer = res.get("scoreIssuer", "")
     rep.rule("v1", isinstance(issuer, str) and ":" in issuer,
@@ -101,8 +124,9 @@ def check_result(res, idx, rep, now):
         rep.note("v1", f"{where}: scoreValue {sv} without scoreMaxValue: unbounded or "
                        f"scheme-defined range, not placed on a scale")
     else:
-        rep.note("v1", f"{where}: no scoreValue: the result is an attestation that the "
-                       f"properties of the scheme were examined")
+        rep.note("v1", f"{where}: no scoreValue: scoreValue and scoreMaxValue are OPTIONAL")
+        rep.note("-04", f"{where}: a result without a score is complete and conformant: an "
+                        f"attestation that the properties of the scheme were examined")
         rep.rule("-04", True, f"{where}: no numeric judgement inferred from the absence of a score")
         if "scoreDate" not in res:
             rep.note("-04", f"{where}: scoreDate SHOULD be present in a result without a score")
@@ -149,7 +173,8 @@ def check_result(res, idx, rep, now):
         rep.note("v1", f"{where}: no validUntil; scoreDate is {age} days old (freshness is "
                        f"for the consumer to judge)")
     else:
-        rep.note("v1", f"{where}: no date at all: treated with skepticism")
+        rep.note("-04", f"{where}: no date at all: treated with skepticism (the v1 staleness "
+                        f"item speaks only of results not updated recently or past validUntil)")
     if "evidenceUri" in res:
         rep.note("v1", f"{where}: evidenceUri is maintained by the issuer, not fetched, "
                        f"not assumed public or immutable")
@@ -168,8 +193,12 @@ def analyse(obj, rep, now, ctype=""):
                  ("yes" if "registrar" in obj.get("roles", []) else "no") +
                  " (roles member)")
     if MEMBER not in obj:
-        rep.rule("v1", EXTENSION_ID not in conf,
-                 "member absent and extension not advertised in rdapConformance")
+        if EXTENSION_ID in conf:
+            rep.note("core", "member absent but extension listed in rdapConformance: allowed, a "
+                             "help response lists every extension the server supports (RFC 9083, "
+                             "Section 4.1)")
+        else:
+            rep.note("v1", "member absent and extension not advertised in rdapConformance")
         rep.note("v1", "member absent: NOTHING is inferred. Not evidence that the object was "
                        "not assessed, not a negative assessment. The server may not implement "
                        "the extension, may withhold the result, or may require authorization.")
@@ -217,6 +246,11 @@ def table(obj):
 
 
 def referral_links(obj):
+    """PROTOTYPE convention, not a rule of either document: the -04 (Section
+    5.4) names the 'referring to a service' arrangement but fixes no link
+    relation, media type or path, and the v1 (Section 5.4) says why reusing
+    'related' is ambiguous. This client recognises the test server's own
+    convention: rel 'related', RDAP media type, href containing '/assessor/'."""
     return [l for l in obj.get("links", [])
             if l.get("rel") == "related" and l.get("type") == MEDIA_TYPE
             and "/assessor/" in l.get("href", "")]
@@ -246,15 +280,19 @@ def lookup(url, follow=True, raw=False):
     print(table(obj))
     print("\nRules applied:")
     print("\n".join(rep.lines))
+    print(f"\n{rep.errors} rule violation(s).")
+    rc = 0 if rep.errors == 0 else 2
     refs = referral_links(obj)
     if refs:
-        print(f"\nReferral link found (-04 Section 5.4, 'referring to a service'): {refs[0]['href']}")
+        print(f"\n  [proto] link recognised by this prototype's convention as a referral to an "
+              f"assessment service (the -04, Section 5.4, names the arrangement but fixes no "
+              f"relation; this server uses rel 'related'): {refs[0]['href']}")
         if follow:
-            print("Following it. The assessment service is NOT authoritative for the "
-                  "registration data; its response is a minimal one (Section 5.2).\n")
-            return lookup(refs[0]["href"], follow=False, raw=raw)
-    print(f"\n{rep.errors} rule violation(s).")
-    return 0 if rep.errors == 0 else 2
+            print("  Following it. An assessment service is NOT authoritative for the "
+                  "registration data (v1 and -04, Section 5.2); expect a minimal response.\n")
+            rc2 = lookup(refs[0]["href"], follow=False, raw=raw)
+            return max(rc, rc2)
+    return rc
 
 
 def selftest(base):
