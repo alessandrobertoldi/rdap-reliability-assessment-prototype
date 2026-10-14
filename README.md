@@ -11,10 +11,12 @@ Written by the author of the specification. It exists so that the extension
 can be seen on the wire, and so that the consumer rules in the documents can
 be seen applied. It is not a production RDAP server.
 
-**Status (14 October 2026):** code complete and tested locally. A public test
-instance at `https://rdap-test.bcsec.io/` is being set up for IETF 127
-(14-20 November 2026); until it answers, run the server locally as shown
-below. Questions and reports: alessandro@bertoldicybersecurity.com.
+**Status (14 October 2026):** a public test instance is online at
+`https://rdap-test.bcsec.io/` for IETF 127 (14-20 November 2026), for
+example `https://rdap-test.bcsec.io/domain/assessed.example`. It is a
+temporary instance and may be withdrawn after the meeting; the server can
+always be run locally as shown below. Questions and reports:
+alessandro@bertoldicybersecurity.com.
 
 ## What it shows
 
@@ -61,6 +63,12 @@ says so and infers nothing:
 
 ```
 python3 client/rdap_ra_client.py --url https://rdap.verisign.com/com/v1/domain/example.com
+```
+
+Against the public test instance:
+
+```
+python3 client/rdap_ra_client.py https://rdap-test.bcsec.io selftest
 ```
 
 Referral switch: `python3 server/rdap_ra_server.py --referral --base-url http://localhost:8080`.

@@ -12,6 +12,7 @@
 		reverse_proxy rdap:8080
 	}
 	handle {
+		header Content-Type "application/rdap+json"
 		respond `{"rdapConformance":["rdap_level_0"],"errorCode":404,"title":"Not Found","description":["Unknown path."]}` 404 {
 			close
 		}

@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.1.1 (2026-10-14)
+
+* Public test instance online at `https://rdap-test.bcsec.io/`; README
+  updated accordingly.
+* Caddy: the 404 returned for paths outside the prototype now carries
+  `Content-Type: application/rdap+json`, like every other response.
+
 ## 0.1.0 (2026-10-14)
 
 First public version, written for the REGEXT session at IETF 127
