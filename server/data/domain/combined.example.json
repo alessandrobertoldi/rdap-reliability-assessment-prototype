@@ -9,11 +9,12 @@
   ],
   "reliabilityAssessment_results": [
     {
-      "scoreScheme": "https://assessor.example/schemes/domain/v2",
-      "scoreIssuer": "https://assessor.example",
+      "scoreScheme": "https://rdap-assessor.bcsec.io/schemes/domain/v2",
+      "scoreIssuer": "https://rdap-assessor.bcsec.io",
       "scoreValue": 8,
       "scoreMaxValue": 10,
-      "scoreDate": "2026-11-10T09:00:00Z"
+      "scoreDate": "2026-11-10T09:00:00Z",
+      "validUntil": "2027-02-10T00:00:00Z"
     }
   ],
   "x_referral": true

@@ -283,6 +283,9 @@ def assessor_help_object():
             "draft-bertoldi-regext-rdap-reliability-scoring, Section 5.2).",
             "It is the service an authoritative test server refers to; see "
             "https://rdap-referral.bcsec.io/help.",
+            "The issuer identifier in its results is the URL of this service. "
+            "Scheme and evidence identifiers are URIs under the same name; "
+            "they identify, and are not meant to be retrieved.",
             "All objects are fictional. No real registrar or domain is assessed.",
             "Lookups: /domain/<name>, /entity/<handle>. Read-only.",
         ],
@@ -311,7 +314,7 @@ def help_object():
             "Test RDAP server for the reliabilityAssessment extension "
             "(IANA RDAP Extensions Registry, registered 2026-10-06).",
             "Wire format: bcsec-RDAP-RA Version 1. Deployment arrangements: "
-            "draft-bertoldi-regext-rdap-reliability-scoring-04, Section 5.4.",
+            "draft-bertoldi-regext-rdap-reliability-scoring, Section 5.4.",
             "All objects are fictional. No real registrar or domain is assessed.",
             "Lookups: /domain/<name>, /entity/<handle>. Read-only.",
         ],
@@ -345,16 +348,20 @@ def help_object():
                 "no registered relation type describes an assessment result, and "
                 "none is defined yet.",
                 "/domain/referred.example carries the link only. "
-                "/domain/combined.example carries basic information (scheme, "
-                "issuer, value with its range, date) together with the link; "
-                "the assessment service returns the full result.",
+                "/domain/combined.example carries basic information together "
+                "with the link: the members fixed when a result is issued "
+                "(scheme, issuer, value with its range, date, expiry). What "
+                "can change afterwards (status) and the detail (assessment "
+                "identifier, evidence) are returned by the assessment service.",
+                "In these two examples the issuer identifier is the URL of the "
+                "assessment service the link points to.",
             ],
         })
     return {"rdapConformance": ["rdap_level_0", EXTENSION_ID], "notices": notices}
 
 
 class Handler(BaseHTTPRequestHandler):
-    server_version = "rdap-ra-proto/0.3.0"
+    server_version = "rdap-ra-proto/0.3.1"
     sys_version = ""
     protocol_version = "HTTP/1.1"
     # Idle socket timeout: a client that opens a connection and sends nothing

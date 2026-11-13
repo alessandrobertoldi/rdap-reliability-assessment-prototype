@@ -1,5 +1,17 @@
 # Changelog
 
+## 0.3.1 (2026-11-13)
+
+* Server: the help response names the Internet-Draft without a revision
+  number (it said -04; Section 5.4 is the same section in the -05).
+* Data: in `combined.example` and `referred.example` the issuer identifier
+  is the URL of the assessment service the link points to, and the scheme
+  and evidence identifiers are URIs under the same name.
+* Data: the basic information carried by the authoritative response for
+  `combined.example` now includes `validUntil`. It consists of the members
+  fixed when a result is issued; `status`, which can change afterwards,
+  and the detail stay with the assessment service. The help responses say so.
+
 ## 0.3.0 (2026-11-13)
 
 The assessment service becomes a separate server, so that the referral

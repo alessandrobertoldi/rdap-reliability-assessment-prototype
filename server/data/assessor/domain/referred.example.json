@@ -4,8 +4,8 @@
   "ldhName": "referred.example",
   "reliabilityAssessment_results": [
     {
-      "scoreScheme": "https://assessor.example/schemes/domain/v2",
-      "scoreIssuer": "https://assessor.example",
+      "scoreScheme": "https://rdap-assessor.bcsec.io/schemes/domain/v2",
+      "scoreIssuer": "https://rdap-assessor.bcsec.io",
       "scoreValue": 7,
       "scoreMaxValue": 10,
       "scoreDate": "2026-10-05T08:00:00Z",
