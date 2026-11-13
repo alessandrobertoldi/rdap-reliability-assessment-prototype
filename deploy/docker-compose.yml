@@ -12,6 +12,11 @@
 #
 #   RDAP_HOST=rdap-test.bcsec.io RDAP_REFERRAL_HOST=rdap-referral.bcsec.io \
 #     docker compose up -d
+#
+# A third instance runs the same program as an assessment service, under
+# RDAP_ASSESSOR_HOST (service rdap-assessor). Set RDAP_ASSESSOR_BASE_URL to
+# its public URL to make the referral instance link to it; left empty, the
+# referral instance simulates the assessment service under /assessor/.
 
 services:
   rdap:
@@ -48,7 +53,30 @@ services:
     environment:
       RDAP_BASE_URL: "https://${RDAP_REFERRAL_HOST:-referral.localhost}"
       RDAP_REFERRAL: "1"
+      RDAP_ASSESSOR_BASE_URL: "${RDAP_ASSESSOR_BASE_URL:-}"
     command: ["--port", "8080", "--base-url", "https://${RDAP_REFERRAL_HOST:-referral.localhost}"]
+    expose:
+      - "8080"
+    depends_on:
+      - rdap
+
+  # Same image, run as an assessment service: not authoritative, minimal
+  # responses from data/assessor/.
+  rdap-assessor:
+    image: rdap-ra-proto:latest
+    restart: unless-stopped
+    read_only: true
+    cap_drop: [ALL]
+    security_opt: [no-new-privileges:true]
+    mem_limit: 128m
+    pids_limit: 64
+    logging:
+      driver: json-file
+      options: {max-size: "10m", max-file: "3"}
+    environment:
+      RDAP_BASE_URL: "https://${RDAP_ASSESSOR_HOST:-assessor.localhost}"
+      RDAP_ASSESSOR_ONLY: "1"
+    command: ["--port", "8080", "--base-url", "https://${RDAP_ASSESSOR_HOST:-assessor.localhost}"]
     expose:
       - "8080"
     depends_on:
@@ -72,6 +100,7 @@ services:
     environment:
       RDAP_HOST: "${RDAP_HOST:-localhost}"
       RDAP_REFERRAL_HOST: "${RDAP_REFERRAL_HOST:-referral.localhost}"
+      RDAP_ASSESSOR_HOST: "${RDAP_ASSESSOR_HOST:-assessor.localhost}"
     volumes:
       - ./Caddyfile:/etc/caddy/Caddyfile:ro
       - caddy_data:/data
@@ -79,6 +108,7 @@ services:
     depends_on:
       - rdap
       - rdap-referral
+      - rdap-assessor
 
 volumes:
   caddy_data:

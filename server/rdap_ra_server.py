@@ -73,6 +73,13 @@ CONFIG = {
     # 5.4 as NOT defined). Point it at another host to make the link cross
     # services for real.
     "assessor_base_url": None,
+    # True when --assessor-base-url points at another service: the local
+    # /assessor/ simulation is then switched off.
+    "assessor_external": False,
+    # Assessment service mode (v1 and -04, Section 5.2): this process is not
+    # an authoritative server. It answers /domain/<name> and /entity/<handle>
+    # with the minimal response of an assessment service, from data/assessor/.
+    "assessor_only": False,
     "data_dir": None,
 }
 
@@ -263,7 +270,41 @@ def error_object(code, title, description):
     }
 
 
+def assessor_help_object():
+    base = CONFIG["base_url"].rstrip("/")
+    notices = [{
+        "title": "About this server",
+        "description": [
+            "Test RDAP assessment service for the reliabilityAssessment extension "
+            "(IANA RDAP Extensions Registry, registered 2026-10-06).",
+            "This service is NOT authoritative for registration data. A response "
+            "identifies the object and carries the assessment result, nothing else "
+            "(bcsec-RDAP-RA Version 1 and "
+            "draft-bertoldi-regext-rdap-reliability-scoring, Section 5.2).",
+            "It is the service an authoritative test server refers to; see "
+            "https://rdap-referral.bcsec.io/help.",
+            "All objects are fictional. No real registrar or domain is assessed.",
+            "Lookups: /domain/<name>, /entity/<handle>. Read-only.",
+        ],
+        "links": [
+            {"value": base + "/help", "rel": "describedby", "type": "text/plain",
+             "href": "https://bcsec.io/rdap/v1/bcsec-rdap-reliability-assessment.txt"},
+            {"value": base + "/help", "rel": "related", "type": "text/html",
+             "href": "https://datatracker.ietf.org/doc/draft-bertoldi-regext-rdap-reliability-scoring/"},
+        ],
+    }, {
+        "title": "Objects available",
+        "description": [
+            "domains: " + ", ".join(sorted(DATA["assessor_domain"])),
+            "entities: " + (", ".join(sorted(DATA["assessor_entity"])) or "none"),
+        ],
+    }]
+    return {"rdapConformance": ["rdap_level_0", EXTENSION_ID], "notices": notices}
+
+
 def help_object():
+    if CONFIG["assessor_only"]:
+        return assessor_help_object()
     notices = [{
         "title": "About this server",
         "description": [
@@ -296,8 +337,10 @@ def help_object():
             "title": "Referral arrangement (prototype)",
             "description": [
                 "This instance also publishes a link from the authoritative "
-                "response to an assessment service, simulated under /assessor/ "
-                "on this host.",
+                "response to an assessment service: "
+                + (f"a separate RDAP service at {CONFIG['assessor_base_url']}."
+                   if CONFIG["assessor_external"]
+                   else "simulated under /assessor/ on this host."),
                 "The link relation 'related' is a placeholder of this prototype: "
                 "no registered relation type describes an assessment result, and "
                 "none is defined yet.",
@@ -311,7 +354,7 @@ def help_object():
 
 
 class Handler(BaseHTTPRequestHandler):
-    server_version = "rdap-ra-proto/0.2.0"
+    server_version = "rdap-ra-proto/0.3.0"
     sys_version = ""
     protocol_version = "HTTP/1.1"
     # Idle socket timeout: a client that opens a connection and sends nothing
@@ -369,6 +412,15 @@ class Handler(BaseHTTPRequestHandler):
         parts = [p for p in path.split("/") if p]
         if parts == ["help"]:
             return 200, help_object()
+        if CONFIG["assessor_only"] and len(parts) == 2 and parts[0] in ("domain", "entity"):
+            # Assessment service mode: minimal response (Section 5.2).
+            cls, key = parts
+            k = key.lower() if cls == "domain" else key
+            store = DATA["assessor_" + cls]
+            if k in store:
+                return 200, with_links(store[k], f"/{cls}/{k}")
+            return 404, error_object(404, "Not Found",
+                                     f"No assessment for {cls} {key!r} at this service.")
         if len(parts) == 2 and parts[0] in ("domain", "entity"):
             cls, key = parts
             store = DATA[cls]
@@ -382,9 +434,10 @@ class Handler(BaseHTTPRequestHandler):
             # Assessment service configuration (v1 and -04, Section 5.2):
             # minimal response, binds the object, carries the member, nothing
             # else. Available only when the referral switch is on.
-            if not CONFIG["referral_enabled"]:
+            if (not CONFIG["referral_enabled"] or CONFIG["assessor_external"]
+                    or CONFIG["assessor_only"]):
                 return 404, error_object(404, "Not Found",
-                                         "The assessment service is disabled on this server.")
+                                         "No assessment service is simulated on this server.")
             cls, key = parts[1], parts[2]
             k = key.lower() if cls == "domain" else key
             store = DATA["assessor_" + cls]
@@ -429,12 +482,18 @@ def main():
                     default=os.environ.get("RDAP_ASSESSOR_BASE_URL") or None,
                     help="base URL of the simulated assessment service "
                          "(default: <base-url>/assessor, same host: a simulation)")
+    ap.add_argument("--assessor-only", action="store_true",
+                    default=os.environ.get("RDAP_ASSESSOR_ONLY", "0") == "1",
+                    help="run as an assessment service, not as an authoritative "
+                         "server: /domain and /entity answer from data/assessor/")
     ap.add_argument("--check", action="store_true", help="validate data and exit")
     args = ap.parse_args()
 
     CONFIG["base_url"] = args.base_url
     CONFIG["referral_enabled"] = args.referral
     CONFIG["assessor_base_url"] = args.assessor_base_url or args.base_url.rstrip("/") + "/assessor"
+    CONFIG["assessor_external"] = bool(args.assessor_base_url)
+    CONFIG["assessor_only"] = args.assessor_only
     CONFIG["data_dir"] = args.data
     try:
         load_data(args.data)
@@ -442,7 +501,8 @@ def main():
         print(f"data error: {e}", file=sys.stderr)
         sys.exit(2)
     print(f"data OK: {len(DATA['domain'])} domains, {len(DATA['entity'])} entities, "
-          f"referral {'ON' if args.referral else 'OFF'}", file=sys.stderr)
+          f"referral {'ON' if args.referral else 'OFF'}"
+          f"{', ASSESSMENT SERVICE mode' if args.assessor_only else ''}", file=sys.stderr)
     if args.check:
         return
     ThreadingHTTPServer.daemon_threads = True

@@ -76,7 +76,7 @@ def parse_dt(value):
 def fetch(url, timeout=15):
     req = urllib.request.Request(url, headers={
         "Accept": MEDIA_TYPE + ", application/json;q=0.5",
-        "User-Agent": "rdap-ra-client/0.2.0 (prototype)",
+        "User-Agent": "rdap-ra-client/0.3.0 (prototype)",
     })
     try:
         with urllib.request.urlopen(req, timeout=timeout) as r:
@@ -250,10 +250,13 @@ def referral_links(obj):
     5.4) names the 'referring to a service' arrangement but fixes no link
     relation, media type or path, and the v1 (Section 5.4) says why reusing
     'related' is ambiguous. This client recognises the test server's own
-    convention: rel 'related', RDAP media type, href containing '/assessor/'."""
+    convention: rel 'related', RDAP media type, and either an href containing
+    '/assessor/' (assessment service simulated on the same host) or the title
+    the test server gives the link (assessment service on another host)."""
     return [l for l in obj.get("links", [])
             if l.get("rel") == "related" and l.get("type") == MEDIA_TYPE
-            and "/assessor/" in l.get("href", "")]
+            and ("/assessor/" in l.get("href", "")
+                 or l.get("title", "").startswith("reliability assessment"))]
 
 
 def lookup(url, follow=True, raw=False):

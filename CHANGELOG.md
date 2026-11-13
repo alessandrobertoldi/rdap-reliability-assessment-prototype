@@ -1,5 +1,25 @@
 # Changelog
 
+## 0.3.0 (2026-11-13)
+
+The assessment service becomes a separate server, so that the referral
+crosses two services for real.
+
+* Server: `--assessor-only` (`RDAP_ASSESSOR_ONLY=1`) runs the program as an
+  assessment service. It is not authoritative: `/domain/<name>` and
+  `/entity/<handle>` answer from `data/assessor/` with the minimal response
+  of Section 5.2, and its help response says so.
+* Server: when `--assessor-base-url` (`RDAP_ASSESSOR_BASE_URL`) is set, the
+  referral link points at that service and the local `/assessor/` simulation
+  is switched off; the help notice names the service. Without it, behaviour
+  is as in 0.2.0.
+* Client: a referral link to an assessment service on another host is
+  recognised by the title the test server gives it (prototype convention).
+* Deployment: Compose service `rdap-assessor` and a third site block in the
+  Caddyfile, selected by `RDAP_ASSESSOR_HOST`.
+* The four reference cases of the self-test are unchanged and pass in all
+  configurations.
+
 ## 0.2.0 (2026-11-13)
 
 A second public instance with the referral arrangement on, and an object

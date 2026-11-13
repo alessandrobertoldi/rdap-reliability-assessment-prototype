@@ -15,8 +15,10 @@ be seen applied. It is not a production RDAP server.
 `https://rdap-test.bcsec.io/` for IETF 127 (14-20 November 2026), for
 example `https://rdap-test.bcsec.io/domain/assessed.example`. Since
 November 2026 a second instance, `https://rdap-referral.bcsec.io/`, runs the
-same server with the referral arrangement on (see below). Both are test
-instances and will stay online after the meeting; the server can always be
+same server with the referral arrangement on, and a third,
+`https://rdap-assessor.bcsec.io/`, runs it as the assessment service the
+second one refers to (see below). All are test instances and will stay
+online after the meeting; the server can always be
 run locally as shown below. Questions and reports:
 alessandro@bertoldicybersecurity.com.
 
@@ -96,6 +98,17 @@ with the referral arrangement always on, under its own name:
 
 ```
 RDAP_HOST=rdap-test.bcsec.io RDAP_REFERRAL_HOST=rdap-referral.bcsec.io docker compose up -d --build
+```
+
+Set `RDAP_ASSESSOR_HOST` to serve a third instance that plays the assessment
+service (`--assessor-only`), and `RDAP_ASSESSOR_BASE_URL` to its public URL so
+that the second instance links to it instead of simulating it under
+`/assessor/`. Locally:
+
+```
+python3 server/rdap_ra_server.py --port 8081 --assessor-only --base-url http://localhost:8081
+python3 server/rdap_ra_server.py --port 8080 --referral --base-url http://localhost:8080 --assessor-base-url http://localhost:8081
+python3 client/rdap_ra_client.py http://localhost:8080 domain combined.example
 ```
 
 ## Design choices
