@@ -1,5 +1,26 @@
 # Changelog
 
+## 0.2.0 (2026-11-13)
+
+A second public instance with the referral arrangement on, and an object
+that combines the two arrangements of Section 5.4.
+
+* Data: new fictional domain `combined.example`. The authoritative response
+  carries a result with basic information only (`scoreScheme`, `scoreIssuer`,
+  `scoreValue` with `scoreMaxValue`, `scoreDate`); with the referral switch
+  on it also carries the link to the assessment service, which returns the
+  full result (`validUntil`, `assessmentId`, `status`, `evidenceUri`). With
+  the switch off the object is served without the link.
+* Server: with the referral switch on, the help response has a third notice
+  saying that the link relation `related` is a placeholder of this prototype
+  and describing `referred.example` and `combined.example`.
+* Deployment: Compose service `rdap-referral` (same image, referral always
+  on) and a second site block in the Caddyfile, selected by
+  `RDAP_REFERRAL_HOST`. The first instance is unchanged: referral off unless
+  `RDAP_REFERRAL=1`.
+* The four reference cases of the self-test are unchanged and pass with the
+  switch on and off.
+
 ## 0.1.3 (2026-10-14)
 
 Deployment hardening after a security review of the public test instance.

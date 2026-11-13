@@ -13,9 +13,11 @@ be seen applied. It is not a production RDAP server.
 
 **Status (14 October 2026):** a public test instance is online at
 `https://rdap-test.bcsec.io/` for IETF 127 (14-20 November 2026), for
-example `https://rdap-test.bcsec.io/domain/assessed.example`. It is a
-temporary instance and may be withdrawn after the meeting; the server can
-always be run locally as shown below. Questions and reports:
+example `https://rdap-test.bcsec.io/domain/assessed.example`. Since
+November 2026 a second instance, `https://rdap-referral.bcsec.io/`, runs the
+same server with the referral arrangement on (see below). Both are test
+instances and will stay online after the meeting; the server can always be
+run locally as shown below. Questions and reports:
 alessandro@bertoldicybersecurity.com.
 
 ## What it shows
@@ -47,6 +49,7 @@ alessandro@bertoldicybersecurity.com.
 | `/entity/RAR1002` | registrar with an attestation carrying no score, past its `validUntil` (C.3) |
 | `/domain/plain.example` | domain without the member: the client infers nothing (C.4) |
 | `/domain/referred.example` | only with the referral switch on: a link to the assessment service, which answers with the minimal response of Section 5.2 |
+| `/domain/combined.example` | the two arrangements together: basic information in the authoritative response (scheme, issuer, value with its range, date) and, with the referral switch on, a link to the assessment service, which returns the full result |
 | `/help` | server notices |
 
 No real registrar or domain is assessed. See Sections 8, 11 and 12 of the
@@ -87,7 +90,13 @@ RDAP_HOST=rdap-test.bcsec.io docker compose up -d --build
 
 Caddy obtains the certificate from Let's Encrypt; the DNS name must point at
 the host first. Only Caddy is exposed (80/443); the RDAP server listens on an
-internal port. Set `RDAP_REFERRAL=1` to enable the referral arrangement.
+internal port. Set `RDAP_REFERRAL=1` to enable the referral arrangement on
+that instance. Set `RDAP_REFERRAL_HOST` as well to serve a second instance,
+with the referral arrangement always on, under its own name:
+
+```
+RDAP_HOST=rdap-test.bcsec.io RDAP_REFERRAL_HOST=rdap-referral.bcsec.io docker compose up -d --build
+```
 
 ## Design choices
 

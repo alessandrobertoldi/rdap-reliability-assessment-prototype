@@ -4,7 +4,14 @@
 #   RDAP_HOST=rdap-test.bcsec.io docker compose up -d
 #
 # The RDAP server is not exposed directly: only Caddy listens on 80/443.
-# To enable the -04 "referring to a service" arrangement set RDAP_REFERRAL=1.
+# To enable the "referring to a service" arrangement on the first instance
+# set RDAP_REFERRAL=1.
+#
+# A second instance of the same server, with the referral arrangement always
+# ON, answers under RDAP_REFERRAL_HOST (service rdap-referral):
+#
+#   RDAP_HOST=rdap-test.bcsec.io RDAP_REFERRAL_HOST=rdap-referral.bcsec.io \
+#     docker compose up -d
 
 services:
   rdap:
@@ -26,6 +33,27 @@ services:
     expose:
       - "8080"
 
+  # Same image, referral arrangement ON, its own public name.
+  rdap-referral:
+    image: rdap-ra-proto:latest
+    restart: unless-stopped
+    read_only: true
+    cap_drop: [ALL]
+    security_opt: [no-new-privileges:true]
+    mem_limit: 128m
+    pids_limit: 64
+    logging:
+      driver: json-file
+      options: {max-size: "10m", max-file: "3"}
+    environment:
+      RDAP_BASE_URL: "https://${RDAP_REFERRAL_HOST:-referral.localhost}"
+      RDAP_REFERRAL: "1"
+    command: ["--port", "8080", "--base-url", "https://${RDAP_REFERRAL_HOST:-referral.localhost}"]
+    expose:
+      - "8080"
+    depends_on:
+      - rdap
+
   caddy:
     image: caddy:2.11
     restart: unless-stopped
@@ -43,12 +71,14 @@ services:
       - "443:443/udp"
     environment:
       RDAP_HOST: "${RDAP_HOST:-localhost}"
+      RDAP_REFERRAL_HOST: "${RDAP_REFERRAL_HOST:-referral.localhost}"
     volumes:
       - ./Caddyfile:/etc/caddy/Caddyfile:ro
       - caddy_data:/data
       - caddy_config:/config
     depends_on:
       - rdap
+      - rdap-referral
 
 volumes:
   caddy_data:

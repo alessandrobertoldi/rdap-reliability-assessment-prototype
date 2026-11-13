@@ -291,11 +291,27 @@ def help_object():
             "referral arrangement: " + ("ON" if CONFIG["referral_enabled"] else "OFF"),
         ],
     }]
+    if CONFIG["referral_enabled"]:
+        notices.append({
+            "title": "Referral arrangement (prototype)",
+            "description": [
+                "This instance also publishes a link from the authoritative "
+                "response to an assessment service, simulated under /assessor/ "
+                "on this host.",
+                "The link relation 'related' is a placeholder of this prototype: "
+                "no registered relation type describes an assessment result, and "
+                "none is defined yet.",
+                "/domain/referred.example carries the link only. "
+                "/domain/combined.example carries basic information (scheme, "
+                "issuer, value with its range, date) together with the link; "
+                "the assessment service returns the full result.",
+            ],
+        })
     return {"rdapConformance": ["rdap_level_0", EXTENSION_ID], "notices": notices}
 
 
 class Handler(BaseHTTPRequestHandler):
-    server_version = "rdap-ra-proto/0.1.3"
+    server_version = "rdap-ra-proto/0.2.0"
     sys_version = ""
     protocol_version = "HTTP/1.1"
     # Idle socket timeout: a client that opens a connection and sends nothing

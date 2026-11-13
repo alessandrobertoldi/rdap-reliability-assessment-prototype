@@ -1,0 +1,20 @@
+{
+  "rdapConformance": ["rdap_level_0", "reliabilityAssessment"],
+  "objectClassName": "domain",
+  "handle": "D-COMBINED-1",
+  "ldhName": "combined.example",
+  "status": ["active"],
+  "events": [
+    {"eventAction": "registration", "eventDate": "2025-06-10T00:00:00Z"}
+  ],
+  "reliabilityAssessment_results": [
+    {
+      "scoreScheme": "https://assessor.example/schemes/domain/v2",
+      "scoreIssuer": "https://assessor.example",
+      "scoreValue": 8,
+      "scoreMaxValue": 10,
+      "scoreDate": "2026-11-10T09:00:00Z"
+    }
+  ],
+  "x_referral": true
+}
