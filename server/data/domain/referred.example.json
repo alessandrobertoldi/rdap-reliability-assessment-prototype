@@ -7,5 +7,19 @@
   "events": [
     {"eventAction": "registration", "eventDate": "2025-02-14T00:00:00Z"}
   ],
+  "entities": [
+    {
+      "objectClassName": "entity",
+      "handle": "RAR1002",
+      "roles": ["registrar"],
+      "publicIds": [{"type": "IANA Registrar ID", "identifier": "1002"}],
+      "links": [
+        {"value": "{BASE}/entity/RAR1002",
+         "rel": "self",
+         "href": "{BASE}/entity/RAR1002",
+         "type": "application/rdap+json"}
+      ]
+    }
+  ],
   "x_referral": true
 }

@@ -67,8 +67,8 @@ alessandro@bertoldicybersecurity.com.
 | `/entity/RAR1001` | registrar with results from two issuers, one under review (C.2) |
 | `/entity/RAR1002` | registrar with an attestation carrying no score, past its `validUntil` (C.3) |
 | `/domain/plain.example` | domain without the member: the client infers nothing (C.4) |
-| `/domain/referred.example` | only with the referral switch on: a link to the assessment service, which answers with the minimal response of Section 5.2 |
-| `/domain/combined.example` | the two arrangements together: basic information in the authoritative response (the members fixed when a result is issued: scheme, issuer, value with its range, date, expiry) and, with the referral switch on, a link to the assessment service, which returns the full result |
+| `/domain/referred.example` | only with the referral switch on: a link to the assessment service, which answers with the minimal response of Section 5.2; its registrar is reachable through `entities` |
+| `/domain/combined.example` | the two arrangements together: basic information in the authoritative response (the members fixed when a result is issued: scheme, issuer, value with its range, date, expiry) and, with the referral switch on, a link to the assessment service, which returns the full result; its registrar is reachable through `entities` |
 | `/help` | server notices |
 
 No real registrar or domain is assessed. See Sections 8, 11 and 12 of the

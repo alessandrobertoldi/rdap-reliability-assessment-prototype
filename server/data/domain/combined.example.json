@@ -7,6 +7,20 @@
   "events": [
     {"eventAction": "registration", "eventDate": "2025-06-10T00:00:00Z"}
   ],
+  "entities": [
+    {
+      "objectClassName": "entity",
+      "handle": "RAR1001",
+      "roles": ["registrar"],
+      "publicIds": [{"type": "IANA Registrar ID", "identifier": "1001"}],
+      "links": [
+        {"value": "{BASE}/entity/RAR1001",
+         "rel": "self",
+         "href": "{BASE}/entity/RAR1001",
+         "type": "application/rdap+json"}
+      ]
+    }
+  ],
   "reliabilityAssessment_results": [
     {
       "scoreScheme": "https://rdap-assessor.bcsec.io/schemes/domain/v2",

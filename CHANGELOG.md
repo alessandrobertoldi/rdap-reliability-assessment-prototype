@@ -1,5 +1,17 @@
 # Changelog
 
+## 0.4.2 (2026-11-15)
+
+* Data: `combined.example` and `referred.example` now carry their registrar
+  in `entities` (`RAR1001` and `RAR1002`, with role, IANA Registrar ID and a
+  `self` link), as `assessed.example` and `plain.example` already did, so
+  that every authoritative domain response shows a complete object. The
+  assessment service responses are unchanged: they stay minimal.
+* No change to the code paths, to the extension member or to any other
+  response: compared with the previous data on every object and in the
+  three configurations, the only difference is the added `entities` member
+  on these two objects.
+
 ## 0.4.1 (2026-11-15)
 
 * Server: the help notice on extension versioning now states what the
