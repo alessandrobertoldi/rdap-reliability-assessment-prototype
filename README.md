@@ -17,7 +17,9 @@ example `https://rdap-test.bcsec.io/domain/assessed.example`. Since
 November 2026 a second instance, `https://rdap-referral.bcsec.io/`, runs the
 same server with the referral arrangement on, and a third,
 `https://rdap-assessor.bcsec.io/`, runs it as the assessment service the
-second one refers to (see below). All are test instances and will stay
+second one refers to (see below). The second and third instances also
+implement extension versioning (Point Versioning, version
+`reliabilityAssessment-0.1`; see below). All are test instances and will stay
 online after the meeting; the server can always be
 run locally as shown below. Questions and reports:
 alessandro@bertoldicybersecurity.com.
@@ -41,6 +43,19 @@ alessandro@bertoldicybersecurity.com.
   `[v1]` stated in the registered specification, `[-04]` stated only in the
   draft, `[core]` RFC 7480 / RFC 9083 / draft-ietf-regext-rdap-extensions,
   `[proto]` a convention of this prototype that no document states.
+* **Extension versioning** (`--versioning`, `RDAP_VERSIONING=1`, **off by
+  default**): Point Versioning as described in
+  [draft-ietf-regext-rdap-versioning-08](https://datatracker.ietf.org/doc/draft-ietf-regext-rdap-versioning/).
+  The identifier in `rdapConformance` stays `reliabilityAssessment` and the
+  member stays `reliabilityAssessment_results`; responses that carry the member
+  add `versioning` to `rdapConformance` and a `versioning_data` member declaring
+  version `reliabilityAssessment-0.1`, and the help response adds
+  `versioning_help`. Version 0.1 is the wire format of the registered v1,
+  unchanged, and the only version served. The version number is a choice of
+  this prototype: neither the registered specification nor the Internet-Draft
+  declares point versions. The client checks these members (`[ver]`), can ask
+  for a version with `--versioning-list` (sent in the `Accept` header), and
+  shows the help response with `help`.
 
 ## Objects served (all fictional, under the reserved `.example` TLD)
 
@@ -110,6 +125,17 @@ python3 server/rdap_ra_server.py --port 8081 --assessor-only --base-url http://l
 python3 server/rdap_ra_server.py --port 8080 --referral --base-url http://localhost:8080 --assessor-base-url http://localhost:8081
 python3 client/rdap_ra_client.py http://localhost:8080 domain combined.example
 ```
+
+Add `--versioning` to both servers (or `RDAP_VERSIONING=1`) to declare the
+version; then, for example:
+
+```
+python3 client/rdap_ra_client.py http://localhost:8080 help
+python3 client/rdap_ra_client.py http://localhost:8080 domain combined.example --versioning-list reliabilityAssessment-0.1
+```
+
+In the Compose file the switch is on for `rdap-referral` and `rdap-assessor`
+and off for the first instance.
 
 ## Design choices
 

@@ -26,6 +26,11 @@ Design choices:
   * Only GET and HEAD. Lookups: /domain/<name>, /entity/<handle>, /help.
   * Media type application/rdap+json (RFC 7480). Errors are RDAP error
     objects (RFC 9083 Section 6), never HTML.
+  * Extension versioning (draft-ietf-regext-rdap-versioning-08, Point
+    Versioning) behind a switch, OFF by default. When on, the extension is
+    declared as version reliabilityAssessment-0.1, whose wire format is that
+    of bcsec-RDAP-RA Version 1, byte for byte: only the members "versioning",
+    "versioning_data" and "versioning_help" are added.
 
 This is a prototype written by the author of the specification. It is not
 a production RDAP server and implements only what the demonstration needs.
@@ -44,6 +49,17 @@ EXTENSION_ID = "reliabilityAssessment"
 MEMBER = "reliabilityAssessment_results"
 MEDIA_TYPE = "application/rdap+json"
 STATUS_VALUES = ("active", "under review", "withdrawn")
+
+# draft-ietf-regext-rdap-versioning-08: extension identifier of the
+# versioning extension itself, and its Point Extension Version Identifier
+# (Section 8 of that draft).
+VERSIONING_ID = "versioning"
+VERSIONING_VERSION = "versioning-0.9"
+# Point Extension Version Identifier of this extension in the prototype
+# (Section 5.2.1 of the versioning draft: name "-" major "." minor). 0.1 is
+# the wire format of bcsec-RDAP-RA Version 1, unchanged. PROTOTYPE choice:
+# neither the registered specification nor the -05 declares point versions.
+EXTENSION_VERSION = EXTENSION_ID + "-0.1"
 ALLOWED_FIELDS = {
     "scoreScheme": str,
     "scoreIssuer": str,
@@ -80,6 +96,9 @@ CONFIG = {
     # an authoritative server. It answers /domain/<name> and /entity/<handle>
     # with the minimal response of an assessment service, from data/assessor/.
     "assessor_only": False,
+    # draft-ietf-regext-rdap-versioning-08, Point Versioning. OFF by default:
+    # with the switch off no response changes.
+    "versioning_enabled": False,
     "data_dir": None,
 }
 
@@ -261,6 +280,81 @@ def apply_referral(obj, cls, key):
     return obj
 
 
+def carries_member(obj):
+    """True when the response carries the extension member, at the top level
+    or inside a nested entity (the registrar inside a domain)."""
+    if MEMBER in obj:
+        return True
+    return any(isinstance(e, dict) and MEMBER in e for e in obj.get("entities", []))
+
+
+def add_versioning_conformance(obj):
+    conf = obj.setdefault("rdapConformance", [])
+    if VERSIONING_ID not in conf:
+        # Same position as in Figures 6, 8 and 13 of the versioning draft:
+        # right after rdap_level_0.
+        pos = conf.index("rdap_level_0") + 1 if "rdap_level_0" in conf else 0
+        conf.insert(pos, VERSIONING_ID)
+
+
+def versioning_data():
+    """draft-ietf-regext-rdap-versioning-08, Section 3.3.3: the versions in
+    use in this response. Shape as in Figure 8 of that draft."""
+    return [
+        {"extension": "rdap_level_0", "type": "opaque", "version": "rdap_level_0"},
+        {"extension": VERSIONING_ID, "type": "point", "version": VERSIONING_VERSION},
+        {"extension": EXTENSION_ID, "type": "point", "version": EXTENSION_VERSION},
+    ]
+
+
+def apply_versioning(obj):
+    """Section 3.3.1 and 3.3.3 of the versioning draft: a response that
+    carries extension fields declares "versioning" in rdapConformance and
+    lists the versions in "versioning_data". Only when the switch is on and
+    only for responses that carry the member; nothing else is touched, and
+    the member itself is never modified."""
+    if not CONFIG["versioning_enabled"] or not carries_member(obj):
+        return obj
+    add_versioning_conformance(obj)
+    obj["versioning_data"] = versioning_data()
+    return obj
+
+
+def versioning_help_members(obj):
+    """Section 3.3.2 of the versioning draft: the help response describes
+    the supported versions; shape as in Figure 13. One version per
+    extension, so each is the default."""
+    if not CONFIG["versioning_enabled"]:
+        return obj
+    add_versioning_conformance(obj)
+    obj["versioning_help"] = [
+        {"extension": "rdap_level_0", "type": "opaque"},
+        {"extension": VERSIONING_ID, "type": "point",
+         "versions": [{"version": VERSIONING_VERSION, "default": True}]},
+        {"extension": EXTENSION_ID, "type": "point",
+         "versions": [{"version": EXTENSION_VERSION, "default": True}]},
+    ]
+    obj["versioning_data"] = [versioning_data()[0], versioning_data()[1]]
+    obj["notices"].append({
+        "title": "Extension versioning (prototype)",
+        "description": [
+            "This instance implements Point Versioning as described in "
+            "draft-ietf-regext-rdap-versioning-08. The extension identifier in "
+            "rdapConformance stays reliabilityAssessment; the version in use is "
+            "declared in versioning_data as " + EXTENSION_VERSION + ".",
+            EXTENSION_VERSION + " is the wire format of bcsec-RDAP-RA Version 1, "
+            "unchanged. It is the only version served, and the default.",
+            "A client may ask for a version in the Accept header, for example "
+            "application/rdap+json;versioning_list=" + EXTENSION_VERSION + ". An "
+            "unsupported version is ignored and the default is returned.",
+            "The version number is a choice of this prototype: neither the "
+            "registered specification nor the Internet-Draft declares point "
+            "versions.",
+        ],
+    })
+    return obj
+
+
 def error_object(code, title, description):
     return {
         "rdapConformance": ["rdap_level_0"],
@@ -302,7 +396,8 @@ def assessor_help_object():
             "entities: " + (", ".join(sorted(DATA["assessor_entity"])) or "none"),
         ],
     }]
-    return {"rdapConformance": ["rdap_level_0", EXTENSION_ID], "notices": notices}
+    return versioning_help_members(
+        {"rdapConformance": ["rdap_level_0", EXTENSION_ID], "notices": notices})
 
 
 def help_object():
@@ -357,11 +452,12 @@ def help_object():
                 "assessment service the link points to.",
             ],
         })
-    return {"rdapConformance": ["rdap_level_0", EXTENSION_ID], "notices": notices}
+    return versioning_help_members(
+        {"rdapConformance": ["rdap_level_0", EXTENSION_ID], "notices": notices})
 
 
 class Handler(BaseHTTPRequestHandler):
-    server_version = "rdap-ra-proto/0.3.1"
+    server_version = "rdap-ra-proto/0.4.0"
     sys_version = ""
     protocol_version = "HTTP/1.1"
     # Idle socket timeout: a client that opens a connection and sends nothing
@@ -425,7 +521,7 @@ class Handler(BaseHTTPRequestHandler):
             k = key.lower() if cls == "domain" else key
             store = DATA["assessor_" + cls]
             if k in store:
-                return 200, with_links(store[k], f"/{cls}/{k}")
+                return 200, apply_versioning(with_links(store[k], f"/{cls}/{k}"))
             return 404, error_object(404, "Not Found",
                                      f"No assessment for {cls} {key!r} at this service.")
         if len(parts) == 2 and parts[0] in ("domain", "entity"):
@@ -434,7 +530,7 @@ class Handler(BaseHTTPRequestHandler):
             k = key.lower() if cls == "domain" else key
             if k in store:
                 obj = with_links(store[k], f"/{cls}/{k}")
-                return 200, apply_referral(obj, cls, k)
+                return 200, apply_versioning(apply_referral(obj, cls, k))
             return 404, error_object(404, "Not Found",
                                      f"No {cls} object with key {key!r} on this server.")
         if len(parts) == 3 and parts[0] == "assessor" and parts[1] in ("domain", "entity"):
@@ -449,7 +545,7 @@ class Handler(BaseHTTPRequestHandler):
             k = key.lower() if cls == "domain" else key
             store = DATA["assessor_" + cls]
             if k in store:
-                return 200, with_links(store[k], f"/assessor/{cls}/{k}")
+                return 200, apply_versioning(with_links(store[k], f"/assessor/{cls}/{k}"))
             return 404, error_object(404, "Not Found",
                                      f"No assessment for {cls} {key!r} at this service.")
         if parts and parts[0] in ("domains", "entities", "nameserver", "nameservers",
@@ -493,6 +589,10 @@ def main():
                     default=os.environ.get("RDAP_ASSESSOR_ONLY", "0") == "1",
                     help="run as an assessment service, not as an authoritative "
                          "server: /domain and /entity answer from data/assessor/")
+    ap.add_argument("--versioning", action="store_true",
+                    default=os.environ.get("RDAP_VERSIONING", "0") == "1",
+                    help="enable Point Versioning (draft-ietf-regext-rdap-versioning-08) "
+                         "as version " + EXTENSION_VERSION + " (default off)")
     ap.add_argument("--check", action="store_true", help="validate data and exit")
     args = ap.parse_args()
 
@@ -501,6 +601,7 @@ def main():
     CONFIG["assessor_base_url"] = args.assessor_base_url or args.base_url.rstrip("/") + "/assessor"
     CONFIG["assessor_external"] = bool(args.assessor_base_url)
     CONFIG["assessor_only"] = args.assessor_only
+    CONFIG["versioning_enabled"] = args.versioning
     CONFIG["data_dir"] = args.data
     try:
         load_data(args.data)
@@ -509,7 +610,9 @@ def main():
         sys.exit(2)
     print(f"data OK: {len(DATA['domain'])} domains, {len(DATA['entity'])} entities, "
           f"referral {'ON' if args.referral else 'OFF'}"
-          f"{', ASSESSMENT SERVICE mode' if args.assessor_only else ''}", file=sys.stderr)
+          f"{', ASSESSMENT SERVICE mode' if args.assessor_only else ''}"
+          f"{', versioning ON (' + EXTENSION_VERSION + ')' if args.versioning else ''}",
+          file=sys.stderr)
     if args.check:
         return
     ThreadingHTTPServer.daemon_threads = True

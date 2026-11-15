@@ -7,6 +7,9 @@ Usage:
   rdap_ra_client.py BASE_URL domain <name>
   rdap_ra_client.py BASE_URL entity <handle>
   rdap_ra_client.py BASE_URL selftest          # runs the four reference cases
+  rdap_ra_client.py BASE_URL help              # help response, versioning_help
+  rdap_ra_client.py ... --versioning-list reliabilityAssessment-0.1
+                                               # ask for a version (Accept header)
   rdap_ra_client.py --url https://rdap.example/domain/foo.example
 
 Each rule the client applies is printed with its origin:
@@ -15,6 +18,8 @@ Each rule the client applies is printed with its origin:
   [core] RFC 7480 / RFC 9083 / draft-ietf-regext-rdap-extensions, not
          specific to the extension
   [proto] a convention of this prototype that no document states
+  [ver]  stated in draft-ietf-regext-rdap-versioning-08 (extension
+         versioning); applied only when the server declares "versioning"
 The two documents define the same wire format; the -04 adds consumer rules
 the v1 does not have. A client written against the v1 alone applies only
 the [v1] lines.
@@ -34,6 +39,11 @@ EXTENSION_ID = "reliabilityAssessment"
 MEMBER = "reliabilityAssessment_results"
 MEDIA_TYPE = "application/rdap+json"
 STATUS_VALUES = ("active", "under review", "withdrawn")
+VERSIONING_ID = "versioning"
+POINT_VERSION_RE = re.compile(r"^(.+)-(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)$")
+# Version identifiers to send in the Accept header (versioning_list media
+# type parameter, Section 3.2.1 of the versioning draft). Empty: none sent.
+VERSIONING_LIST = []
 FIELDS = ("scoreScheme", "scoreIssuer", "scoreValue", "scoreMaxValue", "scoreDate",
           "validUntil", "assessmentId", "status", "evidenceUri")
 
@@ -74,9 +84,12 @@ def parse_dt(value):
 
 
 def fetch(url, timeout=15):
+    accept = MEDIA_TYPE
+    if VERSIONING_LIST:
+        accept += ";versioning_list=" + "+".join(VERSIONING_LIST)
     req = urllib.request.Request(url, headers={
-        "Accept": MEDIA_TYPE + ", application/json;q=0.5",
-        "User-Agent": "rdap-ra-client/0.3.1 (prototype)",
+        "Accept": accept + ", application/json;q=0.5",
+        "User-Agent": "rdap-ra-client/0.4.0 (prototype)",
     })
     try:
         with urllib.request.urlopen(req, timeout=timeout) as r:
@@ -180,6 +193,60 @@ def check_result(res, idx, rep, now):
                        f"not assumed public or immutable")
 
 
+def check_versioning(obj, rep, help_response=False):
+    """draft-ietf-regext-rdap-versioning-08, Sections 3.3.1-3.3.3 and 5.2.1.
+    Applied only when the server declares the versioning extension; a server
+    that does not is not at fault (versioning is not required by the v1 nor
+    by the -05)."""
+    conf = obj.get("rdapConformance", [])
+    has_data = "versioning_data" in obj
+    if VERSIONING_ID not in conf and not has_data and "versioning_help" not in obj:
+        rep.note("ver", "server does not declare extension versioning: no version information; "
+                        "nothing inferred")
+        return
+    rep.rule("ver", VERSIONING_ID in conf, "'versioning' in rdapConformance (Section 3.3.1)")
+    vd = obj.get("versioning_data")
+    if MEMBER in obj or any(MEMBER in e for e in obj.get("entities", []) if isinstance(e, dict)):
+        rep.rule("ver", isinstance(vd, list) and len(vd) > 0,
+                 "versioning_data present in a response with extension fields (Section 3.3.3)")
+    if isinstance(vd, list):
+        ok = all(isinstance(e, dict) and all(k in e for k in ("extension", "type", "version"))
+                 for e in vd)
+        rep.rule("ver", ok, "each versioning_data entry has extension, type, version")
+        for e in vd:
+            if not isinstance(e, dict) or e.get("extension") != EXTENSION_ID:
+                continue
+            v = e.get("version", "")
+            m = POINT_VERSION_RE.match(v) if e.get("type") == "point" else None
+            rep.rule("ver", bool(m) and m.group(1) == EXTENSION_ID,
+                     f"{EXTENSION_ID}: type {e.get('type')!r}, version {v!r} is a Point "
+                     f"Extension Version Identifier for this extension (Section 5.2.1)")
+            rep.note("ver", f"the extension identifier stays {EXTENSION_ID!r} and the member "
+                            f"stays {MEMBER!r}: the version is carried only in versioning_data")
+            if v == EXTENSION_ID + "-0.1":
+                rep.note("proto", f"{v} is, on this test server, the wire format of "
+                                  f"bcsec-RDAP-RA Version 1 unchanged")
+            if VERSIONING_LIST and v not in VERSIONING_LIST:
+                rep.note("ver", f"asked for {'+'.join(VERSIONING_LIST)}, got {v}: an unsupported "
+                                f"version is ignored by the server (Sections 3.2, 6.1)")
+    if help_response:
+        vh = obj.get("versioning_help")
+        rep.rule("ver", isinstance(vh, list), "versioning_help present in the help response "
+                                              "(Section 3.3.2)")
+        for e in vh if isinstance(vh, list) else []:
+            if not isinstance(e, dict):
+                continue
+            rep.rule("ver", "extension" in e and "type" in e,
+                     f"versioning_help entry {e.get('extension')!r} has extension and type")
+            vers = e.get("versions")
+            if e.get("type") == "point" and isinstance(vers, list):
+                defaults = [x.get("version") for x in vers if isinstance(x, dict)
+                            and (x.get("default") is True or (len(vers) == 1
+                                                              and "default" not in x))]
+                rep.rule("ver", len(defaults) == 1,
+                         f"{e.get('extension')}: exactly one default version: {defaults}")
+
+
 def analyse(obj, rep, now, ctype=""):
     rep.rule("core", ctype.split(";")[0].strip() == MEDIA_TYPE,
              f"Content-Type is {MEDIA_TYPE} (got {ctype.split(';')[0].strip() or 'none'})")
@@ -279,6 +346,7 @@ def lookup(url, follow=True, raw=False):
         return 1
     rep = Report()
     analyse(obj, rep, now, ctype)
+    check_versioning(obj, rep)
     print("\nAssessment results:")
     print(table(obj))
     print("\nRules applied:")
@@ -296,6 +364,36 @@ def lookup(url, follow=True, raw=False):
             rc2 = lookup(refs[0]["href"], follow=False, raw=raw)
             return max(rc, rc2)
     return rc
+
+
+def show_help(base):
+    url = base.rstrip("/") + "/help"
+    print(f"GET {url}")
+    status, ctype, body = fetch(url)
+    if status == 0:
+        return 1
+    print(f"  HTTP {status}")
+    try:
+        obj = json.loads(body.decode("utf-8"))
+    except (ValueError, UnicodeDecodeError):
+        print("  body is not JSON; stopping")
+        return 1
+    rep = Report()
+    rep.rule("core", ctype.split(";")[0].strip() == MEDIA_TYPE,
+             f"Content-Type is {MEDIA_TYPE}")
+    conf = obj.get("rdapConformance", [])
+    rep.note("core", f"rdapConformance: {conf}")
+    for n in obj.get("notices", []):
+        rep.note("core", f"notice: {n.get('title')}")
+    check_versioning(obj, rep, help_response=True)
+    for e in obj.get("versioning_help", []) if isinstance(obj.get("versioning_help"), list) else []:
+        vers = ", ".join(x.get("version", "?") + (" (default)" if x.get("default") else "")
+                         for x in e.get("versions", []) if isinstance(x, dict))
+        rep.note("ver", f"supported: {e.get('extension')} [{e.get('type')}] {vers}")
+    print("\nRules applied:")
+    print("\n".join(rep.lines))
+    print(f"\n{rep.errors} rule violation(s).")
+    return 0 if rep.errors == 0 else 2
 
 
 def selftest(base):
@@ -345,12 +443,17 @@ def selftest(base):
 def main():
     ap = argparse.ArgumentParser(description="RDAP client for the reliabilityAssessment extension")
     ap.add_argument("base", nargs="?", help="base URL of the RDAP server")
-    ap.add_argument("what", nargs="?", choices=["domain", "entity", "selftest"])
+    ap.add_argument("what", nargs="?", choices=["domain", "entity", "selftest", "help"])
     ap.add_argument("key", nargs="?", help="domain name or entity handle")
     ap.add_argument("--url", help="full URL to query instead of base/what/key")
     ap.add_argument("--no-follow", action="store_true", help="do not follow a referral link")
     ap.add_argument("--raw", action="store_true", help="also print the JSON response")
+    ap.add_argument("--versioning-list", default="",
+                    help="extension version identifiers to ask for, joined by '+', sent as "
+                         "the versioning_list parameter of the Accept header")
     a = ap.parse_args()
+    if a.versioning_list:
+        VERSIONING_LIST.extend(v for v in a.versioning_list.split("+") if v)
     if a.url:
         sys.exit(lookup(a.url, follow=not a.no_follow, raw=a.raw))
     if not a.base or not a.what:
@@ -358,6 +461,8 @@ def main():
         sys.exit(2)
     if a.what == "selftest":
         sys.exit(selftest(a.base))
+    if a.what == "help":
+        sys.exit(show_help(a.base))
     if not a.key:
         ap.error("a domain name or entity handle is required")
     sys.exit(lookup(a.base.rstrip("/") + f"/{a.what}/{a.key}", follow=not a.no_follow, raw=a.raw))

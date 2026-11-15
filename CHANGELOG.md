@@ -1,5 +1,36 @@
 # Changelog
 
+## 0.4.0 (2026-11-15)
+
+Extension versioning, behind a switch that is off by default.
+
+* Server: `--versioning` (`RDAP_VERSIONING=1`) implements Point Versioning as
+  described in draft-ietf-regext-rdap-versioning-08. Responses that carry the
+  member (at the top level or in a nested entity) add `versioning` to
+  `rdapConformance`, right after `rdap_level_0`, and a `versioning_data`
+  member listing `rdap_level_0`, `versioning-0.9` and
+  `reliabilityAssessment-0.1`. The help response adds `versioning_help`, with
+  one default version per extension, and a notice describing the switch.
+  Responses without the member, and error objects, are unchanged.
+* The extension identifier stays `reliabilityAssessment` and the member stays
+  `reliabilityAssessment_results`. Version 0.1 is the wire format of
+  bcsec-RDAP-RA Version 1, unchanged; it is the only version and the default.
+  A version asked for in the `Accept` header (`versioning_list`) that the
+  server does not support is ignored, as the versioning draft requires.
+* With the switch off every response is unchanged: compared with 0.3.1 on
+  every path, for GET, HEAD and POST, with and without an `Accept` header
+  carrying `versioning_list`, in the three configurations (status, headers
+  other than `Server` and `Date`, body): no difference.
+* Client: rules tagged `[ver]` check `versioning`, `versioning_data` and the
+  Point Extension Version Identifier when a server declares versioning; a
+  server that does not is not at fault. New command `help` checks
+  `versioning_help`. `--versioning-list` sends the `versioning_list`
+  parameter in the `Accept` header.
+* Deployment: the switch is on for `rdap-referral` and `rdap-assessor`, off
+  for the first instance.
+* The four reference cases of the self-test are unchanged and pass with the
+  switch on and off.
+
 ## 0.3.1 (2026-11-13)
 
 * Server: the help response names the Internet-Draft without a revision
