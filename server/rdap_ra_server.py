@@ -347,9 +347,11 @@ def versioning_help_members(obj):
             "A client may ask for a version in the Accept header, for example "
             "application/rdap+json;versioning_list=" + EXTENSION_VERSION + ". An "
             "unsupported version is ignored and the default is returned.",
-            "The version number is a choice of this prototype: neither the "
-            "registered specification nor the Internet-Draft declares point "
-            "versions.",
+            "The registered specification and the Internet-Draft (Section 7.2 "
+            "in each) declare Opaque Versioning, with extension version "
+            "identifier reliabilityAssessment, and do not use Point Versioning. "
+            "This instance shows what Point Versioning would look like; it is "
+            "not a statement of either document.",
         ],
     })
     return obj
@@ -457,7 +459,7 @@ def help_object():
 
 
 class Handler(BaseHTTPRequestHandler):
-    server_version = "rdap-ra-proto/0.4.0"
+    server_version = "rdap-ra-proto/0.4.1"
     sys_version = ""
     protocol_version = "HTTP/1.1"
     # Idle socket timeout: a client that opens a connection and sends nothing

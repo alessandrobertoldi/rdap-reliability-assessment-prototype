@@ -51,9 +51,11 @@ alessandro@bertoldicybersecurity.com.
   add `versioning` to `rdapConformance` and a `versioning_data` member declaring
   version `reliabilityAssessment-0.1`, and the help response adds
   `versioning_help`. Version 0.1 is the wire format of the registered v1,
-  unchanged, and the only version served. The version number is a choice of
-  this prototype: neither the registered specification nor the Internet-Draft
-  declares point versions. The client checks these members (`[ver]`), can ask
+  unchanged, and the only version served. The registered specification and
+  the Internet-Draft (Section 7.2 in each) declare Opaque Versioning, with
+  extension version identifier `reliabilityAssessment`, and do not use Point
+  Versioning: this instance shows what Point Versioning would look like, and
+  is not a statement of either document. The client checks these members (`[ver]`), can ask
   for a version with `--versioning-list` (sent in the `Accept` header), and
   shows the help response with `help`.
 

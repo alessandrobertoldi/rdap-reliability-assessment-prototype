@@ -1,5 +1,17 @@
 # Changelog
 
+## 0.4.1 (2026-11-15)
+
+* Server: the help notice on extension versioning now states what the
+  documents say, instead of only what they do not say. The registered
+  specification and the Internet-Draft (Section 7.2 in each) declare Opaque
+  Versioning, with extension version identifier `reliabilityAssessment`, and
+  do not use Point Versioning; the instance shows what Point Versioning would
+  look like and is not a statement of either document. Same wording in the
+  README.
+* No other change. Responses are unchanged except for that notice, which
+  appears only with the versioning switch on. The client is unchanged.
+
 ## 0.4.0 (2026-11-15)
 
 Extension versioning, behind a switch that is off by default.
