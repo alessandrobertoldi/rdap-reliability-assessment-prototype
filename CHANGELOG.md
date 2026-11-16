@@ -1,5 +1,56 @@
 # Changelog
 
+## 0.5.0 (2026-11-16)
+
+Experiment: transition from Opaque to Point Versioning, behind a second
+switch that is off by default.
+
+* Server: `--transition` (`RDAP_TRANSITION=1`) follows Sections 4 and 7.2
+  (step 1) of draft-ietf-regext-rdap-versioning-08. The registered identifier
+  `reliabilityAssessment` is declared with Opaque Versioning and is the
+  default; a successor identifier with Point Versioning,
+  `draftReliabilityAssessmentExperimental`, version
+  `draftReliabilityAssessmentExperimental-0.1`, is returned only on request.
+  The successor identifier is a placeholder, not a proposed name: identifiers
+  starting with `draft` are reserved for work in progress and cannot be
+  registered (draft-ietf-regext-rdap-extensions-18, Section 2.2).
+* What a client receives: nothing asked, the registered identifier asked, or
+  only unsupported versions asked: `reliabilityAssessment_results`. The
+  successor asked, by version or by bare identifier (Section 5.1):
+  `draftReliabilityAssessmentExperimental_results`, with the same
+  members and the same values. Both asked: the result under both names; the
+  versioning draft does not cover this case and the choice is the
+  prototype's. `rdapConformance` and `versioning_data` list what the response
+  uses. The member is renamed at every depth of nested `entities`. Responses
+  without the member are unchanged. Responses of this instance carry
+  `Vary: Accept`.
+* Help response with the switch on: `versioning_help` relates the two
+  identifiers with `successor`, `predecessor` and `default`. The two opaque
+  entries, `rdap_level_0` and the registered identifier, each carry a single
+  `versions` object equal to the identifier, as the text of Section 5.1.2
+  says (Figures 6 and 11 of the draft omit it). A notice describes the
+  experiment.
+* The server now reads the `versioning_list` parameter of the `Accept`
+  header, on the media type `application/rdap+json` only and not on a range
+  refused with `q=0`. It is used only with the transition switch on: with that switch
+  off the server has one version of each extension and the parameter does
+  not change any response, as before.
+* Client: new `transition` command (18 checks); a `versioning_data` entry for
+  the extension with type `opaque` is now checked against Section 5.1.1
+  instead of being reported as not a point version; a response that carries
+  the result only under the successor name is shown and checked with the
+  same rules as the registered member, with a note saying so.
+* Deployment: a fourth Compose service, `rdap-experimental`, under
+  `RDAP_EXPERIMENTAL_HOST`, and its block in the Caddyfile. The other three
+  services do not set the switch.
+* With the transition switch off, responses are unchanged: compared with
+  0.4.2 in the three existing configurations (plain, referral with
+  versioning, assessment service with versioning) on every path, with GET,
+  HEAD and POST and with seven `Accept` values, 945 comparisons, no
+  difference in status, headers (other than `Date` and `Server`) or body.
+  The `Server` header carries the new version number; the deployed proxy
+  removes that header.
+
 ## 0.4.2 (2026-11-15)
 
 * Data: `combined.example` and `referred.example` now carry their registrar

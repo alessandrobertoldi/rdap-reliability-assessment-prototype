@@ -8,6 +8,8 @@ Usage:
   rdap_ra_client.py BASE_URL entity <handle>
   rdap_ra_client.py BASE_URL selftest          # runs the four reference cases
   rdap_ra_client.py BASE_URL help              # help response, versioning_help
+  rdap_ra_client.py BASE_URL transition        # checks the Opaque-to-Point
+                                               # transition experiment
   rdap_ra_client.py ... --versioning-list reliabilityAssessment-0.1
                                                # ask for a version (Accept header)
   rdap_ra_client.py --url https://rdap.example/domain/foo.example
@@ -44,6 +46,11 @@ POINT_VERSION_RE = re.compile(r"^(.+)-(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)$")
 # Version identifiers to send in the Accept header (versioning_list media
 # type parameter, Section 3.2.1 of the versioning draft). Empty: none sent.
 VERSIONING_LIST = []
+# Transition experiment of the test server (switch --transition): PLACEHOLDER
+# successor identifier with Point Versioning. Not a proposed name.
+SUCCESSOR_ID = "draftReliabilityAssessmentExperimental"
+SUCCESSOR_MEMBER = SUCCESSOR_ID + "_results"
+SUCCESSOR_VERSION = SUCCESSOR_ID + "-0.1"
 FIELDS = ("scoreScheme", "scoreIssuer", "scoreValue", "scoreMaxValue", "scoreDate",
           "validUntil", "assessmentId", "status", "evidenceUri")
 
@@ -83,13 +90,14 @@ def parse_dt(value):
                                   ("+00:00" if off in ("Z", "z") else off))
 
 
-def fetch(url, timeout=15):
+def fetch(url, timeout=15, vlist=None):
     accept = MEDIA_TYPE
-    if VERSIONING_LIST:
-        accept += ";versioning_list=" + "+".join(VERSIONING_LIST)
+    vlist = VERSIONING_LIST if vlist is None else vlist
+    if vlist:
+        accept += ";versioning_list=" + "+".join(vlist)
     req = urllib.request.Request(url, headers={
         "Accept": accept + ", application/json;q=0.5",
-        "User-Agent": "rdap-ra-client/0.4.0 (prototype)",
+        "User-Agent": "rdap-ra-client/0.5.0 (prototype)",
     })
     try:
         with urllib.request.urlopen(req, timeout=timeout) as r:
@@ -206,7 +214,8 @@ def check_versioning(obj, rep, help_response=False):
         return
     rep.rule("ver", VERSIONING_ID in conf, "'versioning' in rdapConformance (Section 3.3.1)")
     vd = obj.get("versioning_data")
-    if MEMBER in obj or any(MEMBER in e for e in obj.get("entities", []) if isinstance(e, dict)):
+    if (MEMBER in obj or SUCCESSOR_MEMBER in obj
+            or any(MEMBER in e for e in obj.get("entities", []) if isinstance(e, dict))):
         rep.rule("ver", isinstance(vd, list) and len(vd) > 0,
                  "versioning_data present in a response with extension fields (Section 3.3.3)")
     if isinstance(vd, list):
@@ -217,6 +226,11 @@ def check_versioning(obj, rep, help_response=False):
             if not isinstance(e, dict) or e.get("extension") != EXTENSION_ID:
                 continue
             v = e.get("version", "")
+            if e.get("type") == "opaque":
+                rep.rule("ver", v == EXTENSION_ID,
+                         f"{EXTENSION_ID}: type 'opaque', version {v!r} matches the "
+                         f"extension identifier (Section 5.1.1)")
+                continue
             m = POINT_VERSION_RE.match(v) if e.get("type") == "point" else None
             rep.rule("ver", bool(m) and m.group(1) == EXTENSION_ID,
                      f"{EXTENSION_ID}: type {e.get('type')!r}, version {v!r} is a Point "
@@ -245,6 +259,20 @@ def check_versioning(obj, rep, help_response=False):
                                                               and "default" not in x))]
                 rep.rule("ver", len(defaults) == 1,
                          f"{e.get('extension')}: exactly one default version: {defaults}")
+
+
+def registered_view(obj):
+    """Transition experiment: a response may carry the result only under the
+    placeholder successor name. Returns (view, True) with the result and the
+    identifier put back under the registered names, so that the same rules
+    are applied to it; (obj, False) when the registered member is present or
+    there is no result at all."""
+    if MEMBER in obj or SUCCESSOR_MEMBER not in obj:
+        return obj, False
+    view = {(MEMBER if k == SUCCESSOR_MEMBER else k): v for k, v in obj.items()}
+    view["rdapConformance"] = [EXTENSION_ID if c == SUCCESSOR_ID else c
+                               for c in obj.get("rdapConformance", [])]
+    return view, True
 
 
 def analyse(obj, rep, now, ctype=""):
@@ -345,10 +373,18 @@ def lookup(url, follow=True, raw=False):
               f"{' '.join(obj.get('description', []))}")
         return 1
     rep = Report()
-    analyse(obj, rep, now, ctype)
+    view, renamed = registered_view(obj)
+    if renamed:
+        rep.note("proto", f"the result is carried as {SUCCESSOR_MEMBER!r}, the placeholder "
+                          f"successor of the transition experiment; the rules below are "
+                          f"applied to it as to {MEMBER!r}")
+    elif SUCCESSOR_MEMBER in obj:
+        rep.note("proto", f"the result is carried under both names; the rules below are "
+                          f"applied to {MEMBER!r}")
+    analyse(view, rep, now, ctype)
     check_versioning(obj, rep)
     print("\nAssessment results:")
-    print(table(obj))
+    print(table(view))
     print("\nRules applied:")
     print("\n".join(rep.lines))
     print(f"\n{rep.errors} rule violation(s).")
@@ -396,6 +432,82 @@ def show_help(base):
     return 0 if rep.errors == 0 else 2
 
 
+def transition(base):
+    """Checks the transition experiment of the test server (--transition):
+    draft-ietf-regext-rdap-versioning-08, Sections 3.2, 3.3, 4, 5.1 and 7.2
+    (step 1). The registered identifier stays opaque and default; the
+    placeholder successor uses Point Versioning and is returned on request."""
+    base = base.rstrip("/")
+    failed = 0
+
+    def line(ok, text):
+        nonlocal failed
+        print(f"{'PASS' if ok else 'FAIL'}  {text}")
+        failed += 0 if ok else 1
+
+    def get(path, vlist):
+        status, ctype, body = fetch(base + path, vlist=vlist)
+        try:
+            return status, json.loads(body.decode("utf-8"))
+        except (ValueError, UnicodeDecodeError):
+            return status, {}
+
+    status, h = get("/help", [])
+    conf = h.get("rdapConformance", [])
+    vh = {e.get("extension"): e for e in h.get("versioning_help", []) if isinstance(e, dict)}
+    old, new = vh.get(EXTENSION_ID, {}), vh.get(SUCCESSOR_ID, {})
+    line(status == 200 and all(x in conf for x in (VERSIONING_ID, EXTENSION_ID, SUCCESSOR_ID)),
+         "help: rdapConformance lists versioning, the registered identifier and the successor")
+    line(old.get("type") == "opaque" and old.get("successor") == SUCCESSOR_ID
+         and old.get("default") is True,
+         "help: registered identifier is opaque, names its successor, is the default "
+         "(Sections 3.3.2, 4)")
+    line(old.get("versions") == [{"version": EXTENSION_ID}],
+         "help: registered identifier has a single version equal to the identifier "
+         "(Section 5.1.2)")
+    line(new.get("type") == "point" and new.get("predecessor") == EXTENSION_ID
+         and new.get("default") is False,
+         "help: successor uses Point Versioning, names its predecessor, is not the default")
+    line([v.get("version") for v in new.get("versions", [])] == [SUCCESSOR_VERSION],
+         f"help: successor has one version, {SUCCESSOR_VERSION}")
+
+    cases = [
+        ("nothing asked", [], True, False),
+        ("registered identifier asked", [EXTENSION_ID], True, False),
+        ("successor asked by version", [SUCCESSOR_VERSION], False, True),
+        ("successor asked by bare identifier (Section 5.1)", [SUCCESSOR_ID], False, True),
+        ("both asked", [EXTENSION_ID, SUCCESSOR_VERSION], True, True),
+        ("unsupported version asked (Sections 3.2, 6.1)", [SUCCESSOR_ID + "-9.9"], True, False),
+    ]
+    for path in ("/domain/assessed.example", "/entity/RAR1001"):
+        _, ref = get(path, [])
+        value = ref.get(MEMBER)
+        for title, vlist, want_old, want_new in cases:
+            status, obj = get(path, vlist)
+            conf = obj.get("rdapConformance", [])
+            vd = {e.get("extension"): e for e in obj.get("versioning_data", [])
+                  if isinstance(e, dict)}
+            ok = status == 200 and VERSIONING_ID in conf
+            ok = ok and (MEMBER in obj) == want_old and (SUCCESSOR_MEMBER in obj) == want_new
+            ok = ok and (EXTENSION_ID in conf) == want_old and (SUCCESSOR_ID in conf) == want_new
+            ok = ok and (EXTENSION_ID in vd) == want_old and (SUCCESSOR_ID in vd) == want_new
+            if ok and want_old:
+                ok = (obj[MEMBER] == value and vd[EXTENSION_ID].get("type") == "opaque"
+                      and vd[EXTENSION_ID].get("version") == EXTENSION_ID)
+            if ok and want_new:
+                ok = (obj[SUCCESSOR_MEMBER] == value and vd[SUCCESSOR_ID].get("type") == "point"
+                      and vd[SUCCESSOR_ID].get("version") == SUCCESSOR_VERSION)
+            names = [k for k in (MEMBER, SUCCESSOR_MEMBER) if k in obj]
+            line(ok, f"{path}: {title} -> {', '.join(names) or 'no result member'}")
+    status, obj = get("/domain/plain.example", [SUCCESSOR_VERSION])
+    line(status == 200 and MEMBER not in obj and SUCCESSOR_MEMBER not in obj
+         and "versioning_data" not in obj,
+         "/domain/plain.example: no result, no versioning_data, whatever is asked")
+    total = 6 + 2 * len(cases)
+    print(f"\n{total - failed} passed, {failed} failed")
+    return 1 if failed else 0
+
+
 def selftest(base):
     """The four reference cases of the -04, Appendix C, as served by the test
     server. Pass/fail per case; the exit code is non-zero on any failure."""
@@ -413,7 +525,7 @@ def selftest(base):
         ok = status == 200
         detail = f"HTTP {status}"
         if ok:
-            obj = json.loads(body.decode("utf-8"))
+            obj, _ = registered_view(json.loads(body.decode("utf-8")))
             rep = Report()
             analyse(obj, rep, now, ctype)
             has = MEMBER in obj
@@ -443,7 +555,7 @@ def selftest(base):
 def main():
     ap = argparse.ArgumentParser(description="RDAP client for the reliabilityAssessment extension")
     ap.add_argument("base", nargs="?", help="base URL of the RDAP server")
-    ap.add_argument("what", nargs="?", choices=["domain", "entity", "selftest", "help"])
+    ap.add_argument("what", nargs="?", choices=["domain", "entity", "selftest", "help", "transition"])
     ap.add_argument("key", nargs="?", help="domain name or entity handle")
     ap.add_argument("--url", help="full URL to query instead of base/what/key")
     ap.add_argument("--no-follow", action="store_true", help="do not follow a referral link")
@@ -463,6 +575,8 @@ def main():
         sys.exit(selftest(a.base))
     if a.what == "help":
         sys.exit(show_help(a.base))
+    if a.what == "transition":
+        sys.exit(transition(a.base))
     if not a.key:
         ap.error("a domain name or entity handle is required")
     sys.exit(lookup(a.base.rstrip("/") + f"/{a.what}/{a.key}", follow=not a.no_follow, raw=a.raw))

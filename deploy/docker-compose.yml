@@ -21,6 +21,12 @@
 # Extension versioning (draft-ietf-regext-rdap-versioning-08, Point
 # Versioning, version reliabilityAssessment-0.1) is ON for rdap-referral and
 # rdap-assessor (RDAP_VERSIONING=1) and OFF for the first instance.
+#
+# A fourth instance, under RDAP_EXPERIMENTAL_HOST (service rdap-experimental),
+# runs the transition experiment (RDAP_TRANSITION=1): the registered
+# identifier stays opaque and default, and a PLACEHOLDER successor with Point
+# Versioning is returned on request (Sections 4 and 7.2 of the versioning
+# draft). The other three instances do not set the switch and do not change.
 
 services:
   rdap:
@@ -88,6 +94,28 @@ services:
     depends_on:
       - rdap
 
+  # Same image, transition experiment ON, its own public name. Authoritative
+  # server with the result carried in the response; no referral.
+  rdap-experimental:
+    image: rdap-ra-proto:latest
+    restart: unless-stopped
+    read_only: true
+    cap_drop: [ALL]
+    security_opt: [no-new-privileges:true]
+    mem_limit: 128m
+    pids_limit: 64
+    logging:
+      driver: json-file
+      options: {max-size: "10m", max-file: "3"}
+    environment:
+      RDAP_BASE_URL: "https://${RDAP_EXPERIMENTAL_HOST:-experimental.localhost}"
+      RDAP_TRANSITION: "1"
+    command: ["--port", "8080", "--base-url", "https://${RDAP_EXPERIMENTAL_HOST:-experimental.localhost}"]
+    expose:
+      - "8080"
+    depends_on:
+      - rdap
+
   caddy:
     image: caddy:2.11
     restart: unless-stopped
@@ -107,6 +135,7 @@ services:
       RDAP_HOST: "${RDAP_HOST:-localhost}"
       RDAP_REFERRAL_HOST: "${RDAP_REFERRAL_HOST:-referral.localhost}"
       RDAP_ASSESSOR_HOST: "${RDAP_ASSESSOR_HOST:-assessor.localhost}"
+      RDAP_EXPERIMENTAL_HOST: "${RDAP_EXPERIMENTAL_HOST:-experimental.localhost}"
     volumes:
       - ./Caddyfile:/etc/caddy/Caddyfile:ro
       - caddy_data:/data
@@ -115,6 +144,7 @@ services:
       - rdap
       - rdap-referral
       - rdap-assessor
+      - rdap-experimental
 
 volumes:
   caddy_data:

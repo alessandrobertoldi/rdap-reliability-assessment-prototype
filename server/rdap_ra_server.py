@@ -31,6 +31,13 @@ Design choices:
     declared as version reliabilityAssessment-0.1, whose wire format is that
     of bcsec-RDAP-RA Version 1, byte for byte: only the members "versioning",
     "versioning_data" and "versioning_help" are added.
+  * Transition from Opaque to Point Versioning behind a second switch, OFF
+    by default (Sections 4 and 7.2 of the same draft). When on, the
+    registered identifier stays opaque and is the default; the same result
+    is also offered, on request only, under a PLACEHOLDER successor
+    identifier that uses Point Versioning. The placeholder starts with
+    "draft" (draft-ietf-regext-rdap-extensions-18, Section 2.2: reserved
+    for work in progress, never registered) and is not a proposed name.
 
 This is a prototype written by the author of the specification. It is not
 a production RDAP server and implements only what the demonstration needs.
@@ -60,6 +67,15 @@ VERSIONING_VERSION = "versioning-0.9"
 # the wire format of bcsec-RDAP-RA Version 1, unchanged. PROTOTYPE choice:
 # neither the registered specification nor the -05 declares point versions.
 EXTENSION_VERSION = EXTENSION_ID + "-0.1"
+# Transition experiment (switch "transition_enabled"). PLACEHOLDER successor
+# identifier, used only to show the mechanism of Section 4 of the versioning
+# draft (predecessor and successor) for an extension that moves from Opaque
+# to Point Versioning. It is not a proposed name: identifiers that start
+# with "draft" are reserved for work in progress and cannot be registered
+# (draft-ietf-regext-rdap-extensions-18, Section 2.2).
+SUCCESSOR_ID = "draftReliabilityAssessmentExperimental"
+SUCCESSOR_MEMBER = SUCCESSOR_ID + "_results"
+SUCCESSOR_VERSION = SUCCESSOR_ID + "-0.1"
 ALLOWED_FIELDS = {
     "scoreScheme": str,
     "scoreIssuer": str,
@@ -99,6 +115,11 @@ CONFIG = {
     # draft-ietf-regext-rdap-versioning-08, Point Versioning. OFF by default:
     # with the switch off no response changes.
     "versioning_enabled": False,
+    # Transition from Opaque to Point Versioning with a successor identifier
+    # (Sections 4 and 7.2 of the versioning draft). OFF by default: with the
+    # switch off no response changes. When on it replaces the behaviour of
+    # "versioning_enabled" for this process.
+    "transition_enabled": False,
     "data_dir": None,
 }
 
@@ -307,12 +328,189 @@ def versioning_data():
     ]
 
 
-def apply_versioning(obj):
+def requested_versions(accept_values):
+    """Section 3.2.1 of the versioning draft: the client lists Extension
+    Version Identifiers in the "versioning_list" parameter of the media type
+    in the Accept header, separated by "+". Returns the set of identifiers
+    asked for; empty when the client asks for nothing."""
+    out = set()
+    for value in accept_values or []:
+        for media_range in value.split(","):
+            parts = media_range.split(";")
+            # The parameter belongs to the RDAP media type: it is not read
+            # from any other media range.
+            if parts[0].strip().lower() != MEDIA_TYPE:
+                continue
+            params = {}
+            for param in parts[1:]:
+                name, _, val = param.strip().partition("=")
+                params.setdefault(name.strip().lower(), val.strip().strip('"'))
+            # A range the client refuses (q=0) carries no request.
+            try:
+                if "q" in params and float(params["q"]) == 0:
+                    continue
+            except ValueError:
+                pass
+            out.update(v for v in params.get("versioning_list", "").split("+") if v)
+    return out
+
+
+def transition_selection(requested):
+    """Which identifiers a response uses in the transition experiment.
+    Returns (old, new). The request is a hint and the server decides
+    (Section 3.2); an unsupported version is ignored. PROTOTYPE policy:
+      * nothing asked, or only versions this server does not have: the
+        registered identifier, which is the default (step 1 of Section 7.2);
+      * the successor asked, by version or by bare identifier: the
+        successor only;
+      * both asked: both, each under its own name. The versioning draft does
+        not say what to do in this case; the prototype does what was asked.
+    """
+    # Section 5.1 of the versioning draft: an extension that uses another
+    # Versioning Type MAY be referred to by its bare identifier, and the
+    # server then returns its default version. The successor has one version.
+    want_new = SUCCESSOR_VERSION in requested or SUCCESSOR_ID in requested
+    want_old = EXTENSION_ID in requested
+    if want_new:
+        return want_old, True
+    return True, False
+
+
+def carries_member_deep(obj):
+    """Like carries_member, at any depth of nested "entities"."""
+    if MEMBER in obj:
+        return True
+    return any(isinstance(e, dict) and carries_member_deep(e)
+               for e in obj.get("entities", []) if isinstance(obj.get("entities"), list))
+
+
+def rename_member(obj, old, new):
+    """Rebuild one JSON object so that the result is carried under the names
+    chosen by transition_selection, in the position of the original member,
+    in this object and in its nested "entities" at any depth. The value (the
+    array of results) is never modified."""
+    out = {}
+    for k, v in obj.items():
+        if k == MEMBER:
+            if old:
+                out[MEMBER] = v
+            if new:
+                out[SUCCESSOR_MEMBER] = json.loads(json.dumps(v))
+        elif k == "entities" and isinstance(v, list):
+            out[k] = [rename_member(e, old, new) if isinstance(e, dict) else e for e in v]
+        else:
+            out[k] = v
+    return out
+
+
+def apply_transition(obj, requested):
+    """Transition experiment: Sections 3.3.1, 3.3.3, 4 and 7.2 of the
+    versioning draft. Only for responses that carry the member."""
+    if not carries_member_deep(obj):
+        return obj
+    old, new = transition_selection(requested)
+    obj = rename_member(obj, old, new)
+    conf = []
+    for c in obj.get("rdapConformance", []):
+        if c == EXTENSION_ID:
+            if old:
+                conf.append(EXTENSION_ID)
+            if new:
+                conf.append(SUCCESSOR_ID)
+        else:
+            conf.append(c)
+    obj["rdapConformance"] = conf
+    add_versioning_conformance(obj)
+    data = [
+        {"extension": "rdap_level_0", "type": "opaque", "version": "rdap_level_0"},
+        {"extension": VERSIONING_ID, "type": "point", "version": VERSIONING_VERSION},
+    ]
+    if old:
+        data.append({"extension": EXTENSION_ID, "type": "opaque", "version": EXTENSION_ID})
+    if new:
+        data.append({"extension": SUCCESSOR_ID, "type": "point", "version": SUCCESSOR_VERSION})
+    obj["versioning_data"] = data
+    return obj
+
+
+def transition_help_members(obj):
+    """Help response of the transition experiment: the two related extension
+    objects of Section 4, with the members of Section 3.3.2."""
+    base = CONFIG["base_url"].rstrip("/")
+    conf = obj.setdefault("rdapConformance", [])
+    if SUCCESSOR_ID not in conf:
+        conf.append(SUCCESSOR_ID)
+    add_versioning_conformance(obj)
+    obj["versioning_help"] = [
+        # Section 5.1.2: for an extension with Opaque Versioning only there
+        # is a single "versions" object whose "version" matches "extension".
+        # Figures 6 and 11 of the draft omit it; the text is followed here,
+        # for both opaque entries (rdap_level_0 is treated as an Opaque
+        # Extension Version Identifier, Section 5.1).
+        {"extension": "rdap_level_0", "type": "opaque",
+         "versions": [{"version": "rdap_level_0"}]},
+        {"extension": VERSIONING_ID, "type": "point",
+         "versions": [{"version": VERSIONING_VERSION, "default": True}]},
+        {"extension": EXTENSION_ID, "type": "opaque",
+         "successor": SUCCESSOR_ID, "default": True,
+         "versions": [{"version": EXTENSION_ID}],
+         "links": [{"value": base + "/help", "rel": "describedby", "type": "text/plain",
+                    "href": "https://bcsec.io/rdap/v1/bcsec-rdap-reliability-assessment.txt"}]},
+        # "default" here is the one among related extension objects (the
+        # successor is not what a client receives when it asks for nothing).
+        # Its single version carries no "default": Section 3.3.2 makes a
+        # single extension version object the default of its extension.
+        {"extension": SUCCESSOR_ID, "type": "point",
+         "predecessor": EXTENSION_ID, "default": False,
+         "versions": [{"version": SUCCESSOR_VERSION}]},
+    ]
+    obj["versioning_data"] = [
+        {"extension": "rdap_level_0", "type": "opaque", "version": "rdap_level_0"},
+        {"extension": VERSIONING_ID, "type": "point", "version": VERSIONING_VERSION},
+    ]
+    obj["notices"].append({
+        "title": "Transition from Opaque to Point Versioning (experiment)",
+        "description": [
+            "This instance is an experiment with draft-ietf-regext-rdap-versioning-08, "
+            "Sections 4 and 7.2: an extension that starts with Opaque Versioning "
+            "and continues with Point Versioning under a successor identifier.",
+            "reliabilityAssessment is the registered identifier. It stays opaque "
+            "and unchanged, and it is the default: a client that asks for nothing "
+            "receives reliabilityAssessment_results, as registered.",
+            SUCCESSOR_ID + " is a PLACEHOLDER successor, not a proposed name. "
+            "Identifiers that start with 'draft' are reserved for work in progress "
+            "and cannot be registered (draft-ietf-regext-rdap-extensions-18, "
+            "Section 2.2). It uses Point Versioning, version " + SUCCESSOR_VERSION + ".",
+            "The successor is returned only on request, with the Accept header "
+            "application/rdap+json;versioning_list=" + SUCCESSOR_VERSION + " (or "
+            "the bare identifier, Section 5.1 of the versioning draft). The "
+            "result is then carried as " + SUCCESSOR_MEMBER + ", with the same "
+            "members and the same values: only the name changes.",
+            "A client that asks for both, with versioning_list=" + EXTENSION_ID + "+"
+            + SUCCESSOR_VERSION + ", receives the result under both names. The "
+            "versioning draft does not say what a server does in this case; this "
+            "is a choice of the prototype. An unsupported version is ignored.",
+            "In versioning_help, default: false on the successor means that it "
+            "is not what a client receives when it asks for nothing. Its single "
+            "version carries no default member: a single version is the default "
+            "of its own extension (Section 3.3.2).",
+            "This is step 1 of Section 7.2 only (new version optional, old version "
+            "default). Neither the registered specification nor the Internet-Draft "
+            "defines a successor identifier; this instance is not a statement of "
+            "either document.",
+        ],
+    })
+    return obj
+
+
+def apply_versioning(obj, requested=None):
     """Section 3.3.1 and 3.3.3 of the versioning draft: a response that
     carries extension fields declares "versioning" in rdapConformance and
     lists the versions in "versioning_data". Only when the switch is on and
     only for responses that carry the member; nothing else is touched, and
     the member itself is never modified."""
+    if CONFIG["transition_enabled"]:
+        return apply_transition(obj, requested or set())
     if not CONFIG["versioning_enabled"] or not carries_member(obj):
         return obj
     add_versioning_conformance(obj)
@@ -324,6 +522,8 @@ def versioning_help_members(obj):
     """Section 3.3.2 of the versioning draft: the help response describes
     the supported versions; shape as in Figure 13. One version per
     extension, so each is the default."""
+    if CONFIG["transition_enabled"]:
+        return transition_help_members(obj)
     if not CONFIG["versioning_enabled"]:
         return obj
     add_versioning_conformance(obj)
@@ -459,7 +659,7 @@ def help_object():
 
 
 class Handler(BaseHTTPRequestHandler):
-    server_version = "rdap-ra-proto/0.4.2"
+    server_version = "rdap-ra-proto/0.5.0"
     sys_version = ""
     protocol_version = "HTTP/1.1"
     # Idle socket timeout: a client that opens a connection and sends nothing
@@ -495,6 +695,9 @@ class Handler(BaseHTTPRequestHandler):
         self.send_header("Content-Length", str(len(body)))
         self.send_header("Access-Control-Allow-Origin", "*")
         self.send_header("Cache-Control", "no-store")
+        if CONFIG["transition_enabled"]:
+            # The response depends on the Accept header on this instance only.
+            self.send_header("Vary", "Accept")
         for k, v in (extra or {}).items():
             self.send_header(k, v)
         self.end_headers()
@@ -515,6 +718,8 @@ class Handler(BaseHTTPRequestHandler):
     def route(self):
         path = unquote(urlsplit(self.path).path)
         parts = [p for p in path.split("/") if p]
+        headers = getattr(self, "headers", None)
+        requested = requested_versions(headers.get_all("Accept") if headers else None)
         if parts == ["help"]:
             return 200, help_object()
         if CONFIG["assessor_only"] and len(parts) == 2 and parts[0] in ("domain", "entity"):
@@ -523,7 +728,7 @@ class Handler(BaseHTTPRequestHandler):
             k = key.lower() if cls == "domain" else key
             store = DATA["assessor_" + cls]
             if k in store:
-                return 200, apply_versioning(with_links(store[k], f"/{cls}/{k}"))
+                return 200, apply_versioning(with_links(store[k], f"/{cls}/{k}"), requested)
             return 404, error_object(404, "Not Found",
                                      f"No assessment for {cls} {key!r} at this service.")
         if len(parts) == 2 and parts[0] in ("domain", "entity"):
@@ -532,7 +737,7 @@ class Handler(BaseHTTPRequestHandler):
             k = key.lower() if cls == "domain" else key
             if k in store:
                 obj = with_links(store[k], f"/{cls}/{k}")
-                return 200, apply_versioning(apply_referral(obj, cls, k))
+                return 200, apply_versioning(apply_referral(obj, cls, k), requested)
             return 404, error_object(404, "Not Found",
                                      f"No {cls} object with key {key!r} on this server.")
         if len(parts) == 3 and parts[0] == "assessor" and parts[1] in ("domain", "entity"):
@@ -547,7 +752,7 @@ class Handler(BaseHTTPRequestHandler):
             k = key.lower() if cls == "domain" else key
             store = DATA["assessor_" + cls]
             if k in store:
-                return 200, apply_versioning(with_links(store[k], f"/assessor/{cls}/{k}"))
+                return 200, apply_versioning(with_links(store[k], f"/assessor/{cls}/{k}"), requested)
             return 404, error_object(404, "Not Found",
                                      f"No assessment for {cls} {key!r} at this service.")
         if parts and parts[0] in ("domains", "entities", "nameserver", "nameservers",
@@ -595,6 +800,11 @@ def main():
                     default=os.environ.get("RDAP_VERSIONING", "0") == "1",
                     help="enable Point Versioning (draft-ietf-regext-rdap-versioning-08) "
                          "as version " + EXTENSION_VERSION + " (default off)")
+    ap.add_argument("--transition", action="store_true",
+                    default=os.environ.get("RDAP_TRANSITION", "0") == "1",
+                    help="experiment: the registered identifier stays opaque and "
+                         "default, and a placeholder successor with Point Versioning "
+                         "(" + SUCCESSOR_VERSION + ") is returned on request (default off)")
     ap.add_argument("--check", action="store_true", help="validate data and exit")
     args = ap.parse_args()
 
@@ -604,6 +814,7 @@ def main():
     CONFIG["assessor_external"] = bool(args.assessor_base_url)
     CONFIG["assessor_only"] = args.assessor_only
     CONFIG["versioning_enabled"] = args.versioning
+    CONFIG["transition_enabled"] = args.transition
     CONFIG["data_dir"] = args.data
     try:
         load_data(args.data)
@@ -613,7 +824,8 @@ def main():
     print(f"data OK: {len(DATA['domain'])} domains, {len(DATA['entity'])} entities, "
           f"referral {'ON' if args.referral else 'OFF'}"
           f"{', ASSESSMENT SERVICE mode' if args.assessor_only else ''}"
-          f"{', versioning ON (' + EXTENSION_VERSION + ')' if args.versioning else ''}",
+          f"{', versioning ON (' + EXTENSION_VERSION + ')' if args.versioning and not args.transition else ''}"
+          f"{', TRANSITION experiment ON (' + SUCCESSOR_VERSION + ' on request)' if args.transition else ''}",
           file=sys.stderr)
     if args.check:
         return

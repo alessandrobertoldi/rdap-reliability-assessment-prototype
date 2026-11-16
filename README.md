@@ -19,7 +19,10 @@ same server with the referral arrangement on, and a third,
 `https://rdap-assessor.bcsec.io/`, runs it as the assessment service the
 second one refers to (see below). The second and third instances also
 implement extension versioning (Point Versioning, version
-`reliabilityAssessment-0.1`; see below). All are test instances and will stay
+`reliabilityAssessment-0.1`; see below). A fourth instance,
+`https://rdap-experimental-opaque-to-point.bcsec.io/`, is an experiment on
+the transition from Opaque to Point Versioning under a placeholder successor
+identifier (see below). All are test instances and will stay
 online after the meeting; the server can always be
 run locally as shown below. Questions and reports:
 alessandro@bertoldicybersecurity.com.
@@ -58,6 +61,29 @@ alessandro@bertoldicybersecurity.com.
   is not a statement of either document. The client checks these members (`[ver]`), can ask
   for a version with `--versioning-list` (sent in the `Accept` header), and
   shows the help response with `help`.
+* **Transition from Opaque to Point Versioning** (`--transition`,
+  `RDAP_TRANSITION=1`, **off by default**): an experiment with Sections 4
+  and 7.2 (step 1) of the same draft. The registered identifier
+  `reliabilityAssessment` stays opaque and unchanged, and it is the default:
+  a client that asks for nothing receives `reliabilityAssessment_results`.
+  The same result is also offered, on request only, under a successor
+  identifier that uses Point Versioning,
+  `draftReliabilityAssessmentExperimental`, version
+  `draftReliabilityAssessmentExperimental-0.1`, as
+  `draftReliabilityAssessmentExperimental_results`: the same members
+  and the same values, only the name changes. **The successor identifier is
+  a placeholder, not a proposed name**: identifiers that start with `draft`
+  are reserved for work in progress and cannot be registered
+  (draft-ietf-regext-rdap-extensions-18, Section 2.2). The help response
+  relates the two with `successor`, `predecessor` and `default`. A client
+  asks for the successor with
+  `Accept: application/rdap+json;versioning_list=draftReliabilityAssessmentExperimental-0.1`
+  (or the bare identifier, Section 5.1); a client that asks for both
+  identifiers receives the result under both names, which is a choice of the
+  prototype because the versioning draft does not cover the case. Neither
+  the registered specification nor the Internet-Draft defines a successor
+  identifier: this instance is not a statement of either document. The
+  client checks all of this with `transition`.
 
 ## Objects served (all fictional, under the reserved `.example` TLD)
 
@@ -138,6 +164,17 @@ python3 client/rdap_ra_client.py http://localhost:8080 domain combined.example -
 
 In the Compose file the switch is on for `rdap-referral` and `rdap-assessor`
 and off for the first instance.
+
+To try the transition experiment:
+
+```
+python3 server/rdap_ra_server.py --port 8082 --transition --base-url http://localhost:8082
+python3 client/rdap_ra_client.py http://localhost:8082 transition
+python3 client/rdap_ra_client.py http://localhost:8082 help
+```
+
+In the Compose file it runs as a fourth service, `rdap-experimental`, under
+`RDAP_EXPERIMENTAL_HOST`; the other three services do not set the switch.
 
 ## Design choices
 
