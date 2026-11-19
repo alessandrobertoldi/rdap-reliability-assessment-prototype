@@ -1,5 +1,22 @@
 # Changelog
 
+## Deployment change (2026-11-19), no new version
+
+* Compose file: `RDAP_VERSIONING` is no longer set for `rdap-referral` and
+  `rdap-assessor`. Their responses no longer carry `versioning`,
+  `versioning_data` or `versioning_help`, and the help response no longer
+  carries the notice on extension versioning. Everything else in their
+  responses is unchanged.
+* Reason: with that switch the registered identifier `reliabilityAssessment`
+  was declared with Point Versioning (`reliabilityAssessment-0.1`), a trial
+  of 15 November 2026, while the fourth instance declares the same identifier
+  with Opaque Versioning and keeps Point Versioning for a successor
+  identifier. The public instances now agree: extension versioning is shown
+  by the fourth instance only.
+* No change to the server or to the client: the `--versioning` switch still
+  exists and is off by default. The first and the fourth instance are not
+  affected.
+
 ## 0.5.0 (2026-11-16)
 
 Experiment: transition from Opaque to Point Versioning, behind a second

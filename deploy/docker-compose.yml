@@ -18,9 +18,10 @@
 # its public URL to make the referral instance link to it; left empty, the
 # referral instance simulates the assessment service under /assessor/.
 #
-# Extension versioning (draft-ietf-regext-rdap-versioning-08, Point
-# Versioning, version reliabilityAssessment-0.1) is ON for rdap-referral and
-# rdap-assessor (RDAP_VERSIONING=1) and OFF for the first instance.
+# Extension versioning is OFF for the first three instances. The switch
+# RDAP_VERSIONING=1 (Point Versioning declared on the registered identifier,
+# a trial of 15 November 2026) is no longer set for rdap-referral and
+# rdap-assessor: extension versioning is shown by the fourth instance only.
 #
 # A fourth instance, under RDAP_EXPERIMENTAL_HOST (service rdap-experimental),
 # runs the transition experiment (RDAP_TRANSITION=1): the registered
@@ -64,7 +65,6 @@ services:
       RDAP_BASE_URL: "https://${RDAP_REFERRAL_HOST:-referral.localhost}"
       RDAP_REFERRAL: "1"
       RDAP_ASSESSOR_BASE_URL: "${RDAP_ASSESSOR_BASE_URL:-}"
-      RDAP_VERSIONING: "1"
     command: ["--port", "8080", "--base-url", "https://${RDAP_REFERRAL_HOST:-referral.localhost}"]
     expose:
       - "8080"
@@ -87,7 +87,6 @@ services:
     environment:
       RDAP_BASE_URL: "https://${RDAP_ASSESSOR_HOST:-assessor.localhost}"
       RDAP_ASSESSOR_ONLY: "1"
-      RDAP_VERSIONING: "1"
     command: ["--port", "8080", "--base-url", "https://${RDAP_ASSESSOR_HOST:-assessor.localhost}"]
     expose:
       - "8080"

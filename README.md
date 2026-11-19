@@ -17,12 +17,12 @@ example `https://rdap-test.bcsec.io/domain/assessed.example`. Since
 November 2026 a second instance, `https://rdap-referral.bcsec.io/`, runs the
 same server with the referral arrangement on, and a third,
 `https://rdap-assessor.bcsec.io/`, runs it as the assessment service the
-second one refers to (see below). The second and third instances also
-implement extension versioning (Point Versioning, version
-`reliabilityAssessment-0.1`; see below). A fourth instance,
-`https://rdap-experimental-opaque-to-point.bcsec.io/`, is an experiment on
-the transition from Opaque to Point Versioning under a placeholder successor
-identifier (see below). All are test instances and will stay
+second one refers to (see below). A fourth instance,
+`https://rdap-experimental-opaque-to-point.bcsec.io/`, is the only one that
+implements extension versioning: it is an experiment on the transition from
+Opaque to Point Versioning, in which the registered identifier stays under
+Opaque Versioning and a placeholder successor identifier uses Point
+Versioning (see below). All are test instances and will stay
 online after the meeting; the server can always be
 run locally as shown below. Questions and reports:
 alessandro@bertoldicybersecurity.com.
@@ -162,8 +162,12 @@ python3 client/rdap_ra_client.py http://localhost:8080 help
 python3 client/rdap_ra_client.py http://localhost:8080 domain combined.example --versioning-list reliabilityAssessment-0.1
 ```
 
-In the Compose file the switch is on for `rdap-referral` and `rdap-assessor`
-and off for the first instance.
+In the Compose file the switch is off for the first three instances. From
+15 to 19 November 2026 it was on for `rdap-referral` and `rdap-assessor`, as
+a trial that declared Point Versioning on the registered identifier; it was
+turned off so that the public instances are consistent with each other: the
+registered identifier is declared under Opaque Versioning wherever
+versioning is declared, which is on the fourth instance only.
 
 To try the transition experiment:
 
