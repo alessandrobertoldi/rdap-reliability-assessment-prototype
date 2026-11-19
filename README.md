@@ -11,40 +11,38 @@ Written by the author of the specification. It exists so that the extension
 can be seen on the wire, and so that the consumer rules in the documents can
 be seen applied. It is not a production RDAP server.
 
-**Status (14 October 2026):** a public test instance is online at
-`https://rdap-test.bcsec.io/` for IETF 127 (14-20 November 2026), for
-example `https://rdap-test.bcsec.io/domain/assessed.example`. Since
-November 2026 a second instance, `https://rdap-referral.bcsec.io/`, runs the
-same server with the referral arrangement on, and a third,
-`https://rdap-assessor.bcsec.io/`, runs it as the assessment service the
-second one refers to (see below). A fourth instance,
-`https://rdap-experimental-opaque-to-point.bcsec.io/`, is the only one that
+**Status (19 November 2026):** four public test instances are online.
+`https://rdap-test.bcsec.io/` is the instance shown at IETF 127 (November
+2026), for example `https://rdap-test.bcsec.io/domain/assessed.example`.
+`https://rdap-referral.bcsec.io/` runs the same server with the referral
+arrangement on, and `https://rdap-assessor.bcsec.io/` runs it as the
+assessment service the second one refers to (see below).
+`https://rdap-experimental-opaque-to-point.bcsec.io/` is the only one that
 implements extension versioning: it is an experiment on the transition from
 Opaque to Point Versioning, in which the registered identifier stays under
 Opaque Versioning and a placeholder successor identifier uses Point
-Versioning (see below). All are test instances and will stay
-online after the meeting; the server can always be
-run locally as shown below. Questions and reports:
+Versioning (see below). All are test instances with fictional data; the
+server can always be run locally as shown below. Questions and reports:
 alessandro@bertoldicybersecurity.com.
 
 ## What it shows
 
 * **Wire format** of the registered v1: identifier `reliabilityAssessment` in
   `rdapConformance`, member `reliabilityAssessment_results`, the nine fields
-  with their types. The -04 defines the same wire format.
-* **Deployment arrangement** of the -04, Section 5.4: the server plays the
+  with their types. The Internet-Draft defines the same wire format.
+* **Deployment arrangement** of the Internet-Draft, Section 5.4: the server plays the
   server *authoritative* for a fictional zone and **carries the result** in its
   own response. The second arrangement, **referring to a service** through a
   link, is implemented behind a switch that is **off by default**, because the
-  -04 does not fix the link relation and the v1 (Section 5.4) explains why
+  Internet-Draft does not fix the link relation and the v1 (Section 5.4) explains why
   reusing `related` is ambiguous. With the switch on, the assessment service
   is *simulated* under `<base>/assessor/` on the same host (`--assessor-base-url`
   moves it elsewhere): an assessment service is by definition a separate
   service, and neither document defines a path segment for it, so this is a
   convention of the prototype, labelled `[proto]` by the client.
 * **Consumer rules**, applied and printed by the client with their origin:
-  `[v1]` stated in the registered specification, `[-04]` stated only in the
-  draft, `[core]` RFC 7480 / RFC 9083 / draft-ietf-regext-rdap-extensions,
+  `[v1]` stated in the registered specification, `[draft]` stated only in the
+  Internet-Draft, `[core]` RFC 7480 / RFC 9083 / draft-ietf-regext-rdap-extensions,
   `[proto]` a convention of this prototype that no document states.
 * **Extension versioning** (`--versioning`, `RDAP_VERSIONING=1`, **off by
   default**): Point Versioning as described in
@@ -74,13 +72,17 @@ alessandro@bertoldicybersecurity.com.
   and the same values, only the name changes. **The successor identifier is
   a placeholder, not a proposed name**: identifiers that start with `draft`
   are reserved for work in progress and cannot be registered
-  (draft-ietf-regext-rdap-extensions-18, Section 2.2). The help response
+  (draft-ietf-regext-rdap-extensions, Section 2.2, "Syntax"). The help response
   relates the two with `successor`, `predecessor` and `default`. A client
   asks for the successor with
   `Accept: application/rdap+json;versioning_list=draftReliabilityAssessmentExperimental-0.1`
   (or the bare identifier, Section 5.1); a client that asks for both
-  identifiers receives the result under both names, which is a choice of the
-  prototype because the versioning draft does not cover the case. Neither
+  identifiers receives the result under both names: the versioning draft
+  leaves the content of the response to server policy (Section 3.2), and
+  returning both follows the transition example of
+  draft-ietf-regext-rdap-extensions (Section 5.4.3.1, "Non-overlapping
+  Superseders"), where a predecessor and its superseder are in use in the
+  same response. Neither
   the registered specification nor the Internet-Draft defines a successor
   identifier: this instance is not a statement of either document. The
   client checks all of this with `transition`.
@@ -186,7 +188,7 @@ In the Compose file it runs as a fourth service, `rdap-experimental`, under
 * Read-only: responses are static JSON files under `server/data/`. There is no
   interface to create or modify results (the extension defines none).
 * Every data file is validated at start-up against the rules of the v1 and of
-  the -04 (`--check` validates and exits), plus two hygiene rules of the
+  the Internet-Draft (`--check` validates and exits), plus two hygiene rules of the
   prototype that the documents do not state (no unknown member in a result; a
   lookup response does not advertise the extension without carrying the
   member). A file that breaks a rule stops the server from starting.

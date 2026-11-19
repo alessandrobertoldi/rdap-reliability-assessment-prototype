@@ -16,13 +16,13 @@ Usage:
 
 Each rule the client applies is printed with its origin:
   [v1]   stated in bcsec-RDAP-RA Version 1, the registered specification
-  [-04]  stated only in draft-bertoldi-regext-rdap-reliability-scoring-04
+  [draft] stated only in draft-bertoldi-regext-rdap-reliability-scoring
   [core] RFC 7480 / RFC 9083 / draft-ietf-regext-rdap-extensions, not
          specific to the extension
   [proto] a convention of this prototype that no document states
   [ver]  stated in draft-ietf-regext-rdap-versioning-08 (extension
          versioning); applied only when the server declares "versioning"
-The two documents define the same wire format; the -04 adds consumer rules
+The two documents define the same wire format; the draft adds consumer rules
 the v1 does not have. A client written against the v1 alone applies only
 the [v1] lines.
 
@@ -97,7 +97,7 @@ def fetch(url, timeout=15, vlist=None):
         accept += ";versioning_list=" + "+".join(vlist)
     req = urllib.request.Request(url, headers={
         "Accept": accept + ", application/json;q=0.5",
-        "User-Agent": "rdap-ra-client/0.5.0 (prototype)",
+        "User-Agent": "rdap-ra-client/0.5.1 (prototype)",
     })
     try:
         with urllib.request.urlopen(req, timeout=timeout) as r:
@@ -137,7 +137,7 @@ def check_result(res, idx, rep, now):
     sv, smax = res.get("scoreValue"), res.get("scoreMaxValue")
     if sv is not None and smax is not None:
         rep.rule("v1", sv <= smax, f"{where}: scoreValue {sv} does not exceed scoreMaxValue {smax}")
-        rep.note("-04", f"{where}: range is 0..{smax} inclusive, so the score can be placed "
+        rep.note("draft", f"{where}: range is 0..{smax} inclusive, so the score can be placed "
                         f"on a scale without resolving the scheme: {sv}/{smax}")
         rep.note("v1", f"{where}: under the v1 alone the lower bound is not stated, "
                        f"so a bar from zero would be an assumption")
@@ -146,11 +146,11 @@ def check_result(res, idx, rep, now):
                        f"scheme-defined range, not placed on a scale")
     else:
         rep.note("v1", f"{where}: no scoreValue: scoreValue and scoreMaxValue are OPTIONAL")
-        rep.note("-04", f"{where}: a result without a score is complete and conformant: an "
+        rep.note("draft", f"{where}: a result without a score is complete and conformant: an "
                         f"attestation that the properties of the scheme were examined")
-        rep.rule("-04", True, f"{where}: no numeric judgement inferred from the absence of a score")
+        rep.rule("draft", True, f"{where}: no numeric judgement inferred from the absence of a score")
         if "scoreDate" not in res:
-            rep.note("-04", f"{where}: scoreDate SHOULD be present in a result without a score")
+            rep.note("draft", f"{where}: scoreDate SHOULD be present in a result without a score")
     if sv is not None and "scoreDate" not in res:
         rep.note("v1", f"{where}: scoreValue present but scoreDate absent (SHOULD be present)")
     # dates
@@ -168,7 +168,7 @@ def check_result(res, idx, rep, now):
         except ValueError:
             rep.rule("v1", False, f"{where}: validUntil is not RFC 3339: {res['validUntil']!r}")
     if sd and vu:
-        rep.rule("-04", vu >= sd, f"{where}: validUntil does not precede scoreDate")
+        rep.rule("draft", vu >= sd, f"{where}: validUntil does not precede scoreDate")
     # status
     st = res.get("status")
     if st is None:
@@ -185,7 +185,7 @@ def check_result(res, idx, rep, now):
             rep.note("v1", f"{where}: past validUntil ({res['validUntil']}): STALE, "
                            f"the issuer does not vouch for currency beyond that point")
             if st == "active":
-                rep.note("-04", f"{where}: 'active' after validUntil conveys the state last "
+                rep.note("draft", f"{where}: 'active' after validUntil conveys the state last "
                                 f"asserted, not a current assertion")
         else:
             rep.note("v1", f"{where}: validUntil in the future: issuer vouches for currency")
@@ -194,7 +194,7 @@ def check_result(res, idx, rep, now):
         rep.note("v1", f"{where}: no validUntil; scoreDate is {age} days old (freshness is "
                        f"for the consumer to judge)")
     else:
-        rep.note("-04", f"{where}: no date at all: treated with skepticism (the v1 staleness "
+        rep.note("draft", f"{where}: no date at all: treated with skepticism (the v1 staleness "
                         f"item speaks only of results not updated recently or past validUntil)")
     if "evidenceUri" in res:
         rep.note("v1", f"{where}: evidenceUri is maintained by the issuer, not fetched, "
@@ -341,7 +341,7 @@ def table(obj):
 
 
 def referral_links(obj):
-    """PROTOTYPE convention, not a rule of either document: the -04 (Section
+    """PROTOTYPE convention, not a rule of either document: the Internet-Draft (Section
     5.4) names the 'referring to a service' arrangement but fixes no link
     relation, media type or path, and the v1 (Section 5.4) says why reusing
     'related' is ambiguous. This client recognises the test server's own
@@ -392,11 +392,11 @@ def lookup(url, follow=True, raw=False):
     refs = referral_links(obj)
     if refs:
         print(f"\n  [proto] link recognised by this prototype's convention as a referral to an "
-              f"assessment service (the -04, Section 5.4, names the arrangement but fixes no "
+              f"assessment service (the Internet-Draft, Section 5.4, names the arrangement but fixes no "
               f"relation; this server uses rel 'related'): {refs[0]['href']}")
         if follow:
             print("  Following it. An assessment service is NOT authoritative for the "
-                  "registration data (v1 and -04, Section 5.2); expect a minimal response.\n")
+                  "registration data (v1 and Internet-Draft, Section 5.2); expect a minimal response.\n")
             rc2 = lookup(refs[0]["href"], follow=False, raw=raw)
             return max(rc, rc2)
     return rc
@@ -509,7 +509,7 @@ def transition(base):
 
 
 def selftest(base):
-    """The four reference cases of the -04, Appendix C, as served by the test
+    """The four reference cases of the Internet-Draft, Appendix C, as served by the test
     server. Pass/fail per case; the exit code is non-zero on any failure."""
     cases = [
         ("C.1 domain lookup with a single result", "domain/assessed.example", True),

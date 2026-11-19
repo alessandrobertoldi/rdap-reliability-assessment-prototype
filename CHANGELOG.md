@@ -1,5 +1,35 @@
 # Changelog
 
+## 0.5.1 (2026-11-19)
+
+Texts only. No change to the behaviour of the server or of the client.
+
+* Server, help notice of the transition experiment: the reference to
+  draft-ietf-regext-rdap-extensions no longer names a revision (the rule on
+  identifiers starting with `draft` is in Section 2.2, "Syntax"). The
+  sentence on a client that asks for both identifiers no longer says that
+  the versioning draft is silent: that draft leaves the content of the
+  response to server policy (Section 3.2), and returning both follows the
+  transition example of draft-ietf-regext-rdap-extensions (Section 5.4.3.1,
+  "Non-overlapping Superseders"), where a predecessor and its superseder are
+  in use in the same response. Since the notice now cites two drafts, its
+  last two paragraphs say "of the versioning draft" after their section
+  numbers. The entry for 0.5.0 below keeps the earlier wording, as released.
+* References to the Internet-Draft of this extension no longer name a
+  revision: in the comments and in two operator-facing strings of the server
+  (a start-up error message and the `--referral` help text), in the client,
+  and in the README. The sections cited (2, 5.2, 5.4, 7.5, Appendix C) were
+  checked against revision -05.
+* Client: the origin tag printed next to the rules stated only in the
+  Internet-Draft is now `[draft]` instead of `[-04]`, and the two sentences
+  printed when a referral link is followed say "Internet-Draft" where they
+  said "-04". Nothing else in the client output changes: compared with the
+  previous client on fifteen commands against the four configurations, the
+  only differing lines are these.
+* README: the status paragraph is dated 19 November 2026.
+* Responses: on the fourth instance only the help notice changes. Every
+  other response of the four instances is unchanged.
+
 ## Deployment change (2026-11-19), no new version
 
 * Compose file: `RDAP_VERSIONING` is no longer set for `rdap-referral` and

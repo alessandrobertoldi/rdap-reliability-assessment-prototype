@@ -5,7 +5,7 @@ extension (IANA RDAP Extensions Registry, registered 2026-10-06).
 
 Wire format: bcsec-RDAP-RA Version 1
   https://bcsec.io/rdap/v1/bcsec-rdap-reliability-assessment.txt
-Deployment arrangements shown: draft-bertoldi-regext-rdap-reliability-scoring-04,
+Deployment arrangements shown: draft-bertoldi-regext-rdap-reliability-scoring,
   Section 5.4 ("carrying the result"; "referring to a service" behind a switch).
 
 The server plays the role of the server AUTHORITATIVE for a fictional test
@@ -19,7 +19,7 @@ Design choices:
     interface for creating or modifying assessment data (the extension
     defines none; Section 11, "Result integrity").
   * All data is validated at start-up against the rules of the v1 and of
-    the -04, plus two hygiene rules of this prototype that the documents do
+    the Internet-Draft, plus two hygiene rules of this prototype that the documents do
     not state (no unknown member inside a result; no advertising of the
     extension in a lookup response that carries no member, which RFC 9083
     Section 4.1 implies). A data file that breaks a rule stops the server.
@@ -36,7 +36,7 @@ Design choices:
     registered identifier stays opaque and is the default; the same result
     is also offered, on request only, under a PLACEHOLDER successor
     identifier that uses Point Versioning. The placeholder starts with
-    "draft" (draft-ietf-regext-rdap-extensions-18, Section 2.2: reserved
+    "draft" (draft-ietf-regext-rdap-extensions, Section 2.2: reserved
     for work in progress, never registered) and is not a proposed name.
 
 This is a prototype written by the author of the specification. It is not
@@ -72,7 +72,7 @@ EXTENSION_VERSION = EXTENSION_ID + "-0.1"
 # draft (predecessor and successor) for an extension that moves from Opaque
 # to Point Versioning. It is not a proposed name: identifiers that start
 # with "draft" are reserved for work in progress and cannot be registered
-# (draft-ietf-regext-rdap-extensions-18, Section 2.2).
+# (draft-ietf-regext-rdap-extensions, Section 2.2, "Syntax").
 SUCCESSOR_ID = "draftReliabilityAssessmentExperimental"
 SUCCESSOR_MEMBER = SUCCESSOR_ID + "_results"
 SUCCESSOR_VERSION = SUCCESSOR_ID + "-0.1"
@@ -92,7 +92,7 @@ REQUIRED_FIELDS = ("scoreScheme", "scoreIssuer")
 # Public base URL of the server (used for "self" links). Set at start-up.
 CONFIG = {
     "base_url": "http://localhost:8080",
-    # -04 Section 5.4, "Referring to a service". OFF by default: the -04 does
+    # Internet-Draft, Section 5.4, "Referring to a service". OFF by default: it does
     # not fix the link relation, and the v1 (Section 5.4) explains why
     # reusing "related" is ambiguous. Enable only to put the question to
     # the working group with a running example.
@@ -100,7 +100,7 @@ CONFIG = {
     # Base URL under which the simulated assessment service answers. In this
     # prototype it defaults to <base_url>/assessor on the SAME host, which is
     # a simulation: an assessment service is by definition a different
-    # service (v1 and -04, Section 2), and the -04 defines no path segment
+    # service (v1 and Internet-Draft, Section 2), and the draft defines no path segment
     # for it (Section 4; the dedicated-segment idea is recorded in Section
     # 5.4 as NOT defined). Point it at another host to make the link cross
     # services for real.
@@ -108,7 +108,7 @@ CONFIG = {
     # True when --assessor-base-url points at another service: the local
     # /assessor/ simulation is then switched off.
     "assessor_external": False,
-    # Assessment service mode (v1 and -04, Section 5.2): this process is not
+    # Assessment service mode (v1 and Internet-Draft, Section 5.2): this process is not
     # an authoritative server. It answers /domain/<name> and /entity/<handle>
     # with the minimal response of an assessment service, from data/assessor/.
     "assessor_only": False,
@@ -163,7 +163,7 @@ def is_uri(value):
 
 
 def validate_result(res, where):
-    """Rules of v1 Section 7.5/7.6 and -04 Section 7.5, applied to one
+    """Rules of v1 Section 7.5/7.6 and Internet-Draft Section 7.5, applied to one
     assessment result object. The 'unknown member' check is prototype
     hygiene for this server's own data files, not a rule of the documents:
     a CLIENT must ignore unknown members (draft-ietf-regext-rdap-extensions,
@@ -196,8 +196,8 @@ def validate_result(res, where):
     sd = parse_rfc3339(res["scoreDate"], where) if "scoreDate" in res else None
     vu = parse_rfc3339(res["validUntil"], where) if "validUntil" in res else None
     if sd and vu and vu < sd:
-        # -04 only: validUntil MUST NOT precede scoreDate.
-        raise DataError(f"{where}: validUntil precedes scoreDate (-04, Section 7.5)")
+        # Internet-Draft only: validUntil MUST NOT precede scoreDate.
+        raise DataError(f"{where}: validUntil precedes scoreDate (Internet-Draft, Section 7.5)")
 
 
 def validate_envelope(obj, where):
@@ -280,7 +280,7 @@ def with_links(obj, path):
 
 
 def apply_referral(obj, cls, key):
-    """-04 Section 5.4, second arrangement: the authoritative server publishes
+    """Internet-Draft, Section 5.4, second arrangement: the authoritative server publishes
     a link to a resource from which the result may be retrieved. Only when
     the switch is on, and only for objects that carry a 'referral' marker in
     their data file instead of the member itself."""
@@ -363,8 +363,12 @@ def transition_selection(requested):
         registered identifier, which is the default (step 1 of Section 7.2);
       * the successor asked, by version or by bare identifier: the
         successor only;
-      * both asked: both, each under its own name. The versioning draft does
-        not say what to do in this case; the prototype does what was asked.
+      * both asked: both, each under its own name. The versioning draft
+        leaves the content of the response to server policy (Section 3.2);
+        returning both follows the transition example of
+        draft-ietf-regext-rdap-extensions, Section 5.4.3.1 ("Non-overlapping
+        Superseders"), where predecessor and superseder are in the same
+        response.
     """
     # Section 5.1 of the versioning draft: an extension that uses another
     # Versioning Type MAY be referred to by its bare identifier, and the
@@ -479,8 +483,9 @@ def transition_help_members(obj):
             "receives reliabilityAssessment_results, as registered.",
             SUCCESSOR_ID + " is a PLACEHOLDER successor, not a proposed name. "
             "Identifiers that start with 'draft' are reserved for work in progress "
-            "and cannot be registered (draft-ietf-regext-rdap-extensions-18, "
-            "Section 2.2). It uses Point Versioning, version " + SUCCESSOR_VERSION + ".",
+            "and cannot be registered (draft-ietf-regext-rdap-extensions, "
+            "Section 2.2, \"Syntax\"). It uses Point Versioning, version "
+            + SUCCESSOR_VERSION + ".",
             "The successor is returned only on request, with the Accept header "
             "application/rdap+json;versioning_list=" + SUCCESSOR_VERSION + " (or "
             "the bare identifier, Section 5.1 of the versioning draft). The "
@@ -488,13 +493,16 @@ def transition_help_members(obj):
             "members and the same values: only the name changes.",
             "A client that asks for both, with versioning_list=" + EXTENSION_ID + "+"
             + SUCCESSOR_VERSION + ", receives the result under both names. The "
-            "versioning draft does not say what a server does in this case; this "
-            "is a choice of the prototype. An unsupported version is ignored.",
+            "versioning draft leaves the content of the response to server policy "
+            "(Section 3.2). Returning both follows the transition example of "
+            "draft-ietf-regext-rdap-extensions (Section 5.4.3.1, \"Non-overlapping "
+            "Superseders\"), where a predecessor and its superseder are in use in "
+            "the same response. An unsupported version is ignored.",
             "In versioning_help, default: false on the successor means that it "
             "is not what a client receives when it asks for nothing. Its single "
             "version carries no default member: a single version is the default "
-            "of its own extension (Section 3.3.2).",
-            "This is step 1 of Section 7.2 only (new version optional, old version "
+            "of its own extension (Section 3.3.2 of the versioning draft).",
+            "This is step 1 of Section 7.2 of the versioning draft only (new version optional, old version "
             "default). Neither the registered specification nor the Internet-Draft "
             "defines a successor identifier; this instance is not a statement of "
             "either document.",
@@ -659,7 +667,7 @@ def help_object():
 
 
 class Handler(BaseHTTPRequestHandler):
-    server_version = "rdap-ra-proto/0.5.0"
+    server_version = "rdap-ra-proto/0.5.1"
     sys_version = ""
     protocol_version = "HTTP/1.1"
     # Idle socket timeout: a client that opens a connection and sends nothing
@@ -741,7 +749,7 @@ class Handler(BaseHTTPRequestHandler):
             return 404, error_object(404, "Not Found",
                                      f"No {cls} object with key {key!r} on this server.")
         if len(parts) == 3 and parts[0] == "assessor" and parts[1] in ("domain", "entity"):
-            # Assessment service configuration (v1 and -04, Section 5.2):
+            # Assessment service configuration (v1 and Internet-Draft, Section 5.2):
             # minimal response, binds the object, carries the member, nothing
             # else. Available only when the referral switch is on.
             if (not CONFIG["referral_enabled"] or CONFIG["assessor_external"]
@@ -787,7 +795,7 @@ def main():
     ap.add_argument("--base-url", default=os.environ.get("RDAP_BASE_URL", "http://localhost:8080"))
     ap.add_argument("--referral", action="store_true",
                     default=os.environ.get("RDAP_REFERRAL", "0") == "1",
-                    help="enable the -04 'referring to a service' arrangement (default off)")
+                    help="enable the 'referring to a service' arrangement of the Internet-Draft (default off)")
     ap.add_argument("--assessor-base-url",
                     default=os.environ.get("RDAP_ASSESSOR_BASE_URL") or None,
                     help="base URL of the simulated assessment service "
